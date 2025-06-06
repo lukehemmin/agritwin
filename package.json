@@ -1,0 +1,49 @@
+{
+  "name": "agritwin",
+  "version": "1.0.0",
+  "description": "AgriTwin - 도심형 스마트 농장 디지털 트윈 시스템",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "build": "npm run client:build && npm run server:build",
+    "start": "npm run server:start",
+    "server:dev": "cd server && npm run dev",
+    "server:build": "cd server && npm run build",
+    "server:start": "cd server && npm start",
+    "client:dev": "cd client && npm run dev",
+    "client:build": "cd client && npm run build",
+    "client:preview": "cd client && npm run preview",
+    "install:all": "cd server && npm install && cd ../client && npm install",
+    "clean": "rimraf server/dist client/dist",
+    "lint": "eslint . --ext .ts,.tsx --fix",
+    "test": "jest"
+  },
+  "keywords": [
+    "digital-twin",
+    "smart-farming",
+    "3d-visualization",
+    "iot",
+    "react",
+    "nodejs",
+    "typescript"
+  ],
+  "author": "AgriTwin Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "concurrently": "^8.2.0",
+    "eslint": "^8.45.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "jest": "^29.6.0",
+    "prettier": "^3.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
