@@ -1,16 +1,24 @@
 import '@testing-library/jest-dom';
 
 // Mock IntersectionObserver
-global.IntersectionObserver = class IntersectionObserver {
-  constructor() {}
-  observe() {
-    return null;
+global.IntersectionObserver = class IntersectionObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null;
+  readonly rootMargin: string = '';
+  readonly thresholds: ReadonlyArray<number> = [];
+
+  constructor(_callback: IntersectionObserverCallback, _options?: IntersectionObserverInit) {}
+
+  observe(_target: Element): void {
+    // no-op
   }
-  disconnect() {
-    return null;
+  unobserve(_target: Element): void {
+    // no-op
   }
-  unobserve() {
-    return null;
+  disconnect(): void {
+    // no-op
+  }
+  takeRecords(): IntersectionObserverEntry[] {
+    return [];
   }
 };
 

@@ -9,7 +9,8 @@ import { TimeRange } from '../components/controls/TimeRange';
 import { Loading } from '../components/common/Loading';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { apiService } from '../services/api';
-import { FarmStructure } from '../types/farm.types';
+import { FarmStructure, FarmZone } from '../types/farm.types';
+import { Sensor } from '../types/sensor.types';
 
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -20,6 +21,7 @@ const Dashboard: React.FC = () => {
   ]);
   const [farmStructure, setFarmStructure] = useState<FarmStructure | null>(null);
   const [farmSummary, setFarmSummary] = useState<any>(null);
+  const [processedZones, setProcessedZones] = useState<FarmZone[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // WebSocket hook
@@ -42,6 +44,11 @@ const Dashboard: React.FC = () => {
         // Load farm structure
         const structure = await apiService.getFarmStructure();
         console.log('📊 Dashboard: Farm structure loaded', structure);
+        console.log('📊 Dashboard: Raw farm structure from API:', JSON.stringify(structure, null, 2));
+        if (structure && structure.zones && structure.zones.length > 0) {
+          console.log('📊 Dashboard: First zone raw sensors from API (structure.zones[0].sensors):', JSON.stringify(structure.zones[0].sensors, null, 2));
+          console.log('📊 Dashboard: All zones raw sensors from API (structure.zones.map(z => z.sensors)):', JSON.stringify(structure.zones.map(z => z.sensors), null, 2));
+        }
         setFarmStructure(structure);
         
         // Load farm summary
@@ -85,6 +92,118 @@ const Dashboard: React.FC = () => {
     });
   }, [alerts]);
 
+  // Effect to update/populate zones with sensor definitions and their latest data
+  useEffect(() => {
+    if (farmStructure?.zones) { // Ensure farmStructure and its zones are loaded
+      console.log('🔄 Dashboard: Processing zones and sensor data...');
+      if (farmStructure.zones.length > 0) {
+        console.log('🔄 Dashboard: Inside processing useEffect - First zone.sensors from farmStructure:', JSON.stringify(farmStructure.zones[0]?.sensors, null, 2));
+        console.log('🔄 Dashboard: Inside processing useEffect - All zone.sensors from farmStructure:', JSON.stringify(farmStructure.zones.map(z => z.sensors), null, 2));
+      }
+      const newProcessedZones = farmStructure.zones.map(zone => {
+        // Attempt to parse sensors from sensors_json if available
+        let currentZoneSensors: Sensor[] = []; // Initialize currentZoneSensors
+        if ((zone as any).sensors_json) {
+          try {
+            // The sensors_json string is a comma-separated list of JSON objects,
+            // not a valid JSON array. Wrap with '[' and ']' to make it parsable.
+            const validJsonString = `[${(zone as any).sensors_json}]`;
+            const sensorsFromJson = JSON.parse(validJsonString) as Partial<Sensor>[]; // Use Partial<Sensor> for flexibility
+
+            // Define valid sensor types and statuses based on the Sensor interface
+            const validSensorTypes: Sensor['type'][] = ['temperature', 'humidity', 'soil_moisture', 'light', 'co2'];
+            const validSensorStatuses: NonNullable<Sensor['latest_status']>[] = ['normal', 'warning', 'critical'];
+
+            currentZoneSensors = sensorsFromJson.map((s, index) => {
+              let determinedType: Sensor['type'];
+              if (s.type && validSensorTypes.includes(s.type as Sensor['type'])) {
+                determinedType = s.type as Sensor['type'];
+              } else {
+                // console.warn(`Dashboard: Invalid or missing sensor type '${s.type}' for sensor in zone ${zone.id}. Defaulting to '${validSensorTypes[0]}'.`);
+                determinedType = validSensorTypes[0]; // Default to the first valid type
+              }
+
+              let determinedStatus: Sensor['latest_status'];
+              if (s.latest_status) {
+                if (validSensorStatuses.includes(s.latest_status as NonNullable<Sensor['latest_status']>)) {
+                  determinedStatus = s.latest_status as NonNullable<Sensor['latest_status']>;
+                } else {
+                  // console.warn(`Dashboard: Invalid sensor status '${s.latest_status}' for sensor in zone ${zone.id}. Defaulting to 'normal'.`);
+                  determinedStatus = 'normal'; // Default for invalid but present status
+                }
+              } else {
+                determinedStatus = undefined; // Status is optional
+              }
+
+              const newSensor: Sensor = {
+                id: s.id || `sensor-${zone.id}-${determinedType}-${index}`,
+                name: s.name || `${zone.name} ${determinedType} Sensor ${index + 1}`,
+                type: determinedType,
+                zone_id: zone.id,
+                position_x: s.position_x ?? 0,
+                position_y: s.position_y ?? 0,
+                position_z: s.position_z ?? 0,
+                min_normal: s.min_normal ?? 0,
+                max_normal: s.max_normal ?? 0,
+                min_warning: s.min_warning ?? 0,
+                max_warning: s.max_warning ?? 0,
+                min_critical: s.min_critical ?? 0,
+                max_critical: s.max_critical ?? 0,
+                unit: s.unit || '', // Ensure unit is always a string
+                is_active: s.is_active ?? true,
+                created_at: s.created_at || new Date().toISOString(),
+                latest_value: s.latest_value,
+                latest_status: determinedStatus,
+                latest_timestamp: s.latest_timestamp,
+              };
+              return newSensor;
+            });
+            // console.log(`🔄 Dashboard: Parsed ${currentZoneSensors.length} sensors from sensors_json for zone ${zone.id}. First:`, currentZoneSensors[0]);
+          } catch (error) {
+            console.error(`❌ Dashboard: Error parsing sensors_json for zone ${zone.id}:`, error, `JSON string: ${(zone as any).sensors_json}`);
+            currentZoneSensors = []; 
+          }
+        } else {
+           console.log(`ℹ️ Dashboard: No sensors_json found for zone ${zone.id}. Initializing with empty sensor array.`);
+           currentZoneSensors = [];
+        }
+        // Add a log to see what currentZoneSensors contains after parsing, before WebSocket merge
+        if (currentZoneSensors.length > 0) {
+            console.log(`ℹ️ Dashboard: Zone ${zone.id} has ${currentZoneSensors.length} sensors after parsing sensors_json. First sensor:`, currentZoneSensors[0]);
+        } else {
+            console.log(`ℹ️ Dashboard: Zone ${zone.id} has no sensors after attempting to parse sensors_json.`);
+        }
+
+        // If we have live sensor data from WebSocket, update/enrich our sensor definitions
+        if (sensorData && sensorData.length > 0) {
+          currentZoneSensors = currentZoneSensors.map(definedSensor => {
+            const liveUpdate = sensorData.find(sd => sd.sensor_id === definedSensor.id);
+            if (liveUpdate) {
+              return {
+                ...definedSensor,
+                latest_value: liveUpdate.value,
+                latest_status: liveUpdate.status,
+                latest_timestamp: liveUpdate.timestamp,
+              };
+            }
+            return definedSensor; // No live update for this sensor, keep API-provided data
+          });
+        }
+        
+        return {
+          ...zone,
+          sensors: currentZoneSensors, // This is now Sensor[]
+          sensor_count: currentZoneSensors.length,
+        };
+      });
+      setProcessedZones(newProcessedZones); // newProcessedZones is FarmZone[] with correct Sensor[]
+      console.log('✅ Dashboard: Processed zones with sensor data', newProcessedZones);
+    } else {
+      // If farmStructure or its zones are not available, reset processedZones
+      setProcessedZones([]);
+    }
+  }, [farmStructure, sensorData]);
+
   if (isLoading) {
     return <Loading fullScreen message="농장 데이터를 불러오는 중..." />;
   }
@@ -107,7 +226,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const zones = farmStructure?.zones || [];
+  // const zones = farmStructure?.zones || []; // 이제 processedZones를 사용합니다.
   const overview = farmSummary?.overview;
   const sensorAverages = farmSummary?.sensor_averages || [];
 
@@ -232,12 +351,12 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900">3D 농장 뷰</h2>
               <ZoneSelector
-                zones={zones.map(zone => ({
+                zones={processedZones.map(zone => ({ // farmStructure.zones 대신 processedZones 사용
                   id: zone.id,
                   name: zone.name,
                   level: zone.level,
                   cropType: zone.crop_type,
-                  sensorCount: zone.sensors?.length || 5,
+                  sensorCount: zone.sensor_count || 0, // 이제 zone.sensor_count가 useEffect에서 업데이트됨
                   healthScore: Math.round(Math.random() * 20 + 80) // Placeholder health score
                 }))}
                 selectedZone={selectedZone}
@@ -248,7 +367,7 @@ const Dashboard: React.FC = () => {
           
           <div className="flex-1 relative overflow-hidden">
             <FarmViewer 
-              zones={zones}
+              zones={processedZones} // farmStructure.zones 대신 processedZones 사용
               sensorData={sensorData}
               selectedZone={selectedZone}
               onZoneSelect={setSelectedZone}

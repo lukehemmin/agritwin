@@ -2,8 +2,29 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { FarmZone } from '../../types/farm.types';
 import { Sensor } from '../../types/sensor.types';
-import { loadSensorModel } from '../../utils/modelLoader';
-// import { createLabel } from '../../utils/labelUtils'; // Assuming a utility for labels
+
+// Helper function to create a zone mesh
+function createZoneMesh(id: string, sizeX: number, sizeY: number, sizeZ: number, posX: number, posY: number, posZ: number, currentSelectedZoneId: string | null) {
+  const zoneMaterial = new THREE.MeshStandardMaterial({
+    color: id === currentSelectedZoneId ? SELECTED_ZONE_COLOR : DEFAULT_ZONE_COLOR,
+    transparent: true,
+    opacity: ZONE_OPACITY,
+    side: THREE.DoubleSide,
+    roughness: 0.7,
+    metalness: 0.2,
+  });
+
+  const zoneGeometry = new THREE.BoxGeometry(sizeX, sizeY, sizeZ);
+  const zoneMesh = new THREE.Mesh(zoneGeometry, zoneMaterial);
+  // 구역의 position_y는 BoxGeometry의 중심이므로, (바닥 y + 높이/2)
+  zoneMesh.position.set(posX, posY + sizeY / 2, posZ);
+  zoneMesh.name = `zone-${id}`;
+  zoneMesh.userData = { type: 'zone', zoneId: id };
+  zoneMesh.castShadow = true; // Zones can cast shadows
+  // zoneMesh.receiveShadow = true; // Zones can also receive shadows
+  return zoneMesh;
+}
+
 
 interface FarmModelProps {
   scene: THREE.Scene;
@@ -34,10 +55,10 @@ const BASE_PLATFORM_HEIGHT = 0.15;
 const BASE_PLATFORM_COLOR = 0xAAAAAA; // Grey for base
 const greenhouseInitialYOffset = BASE_PLATFORM_HEIGHT;
 
-const PIPE_RADIUS = 0.15;
-const PIPE_COLOR = 0xEAEAEA; // Lighter grey for pipes
-const PIPE_SEGMENTS = 16;
-const pipeMaterial = new THREE.MeshStandardMaterial({ color: PIPE_COLOR, roughness: 0.3, metalness: 0.1 });
+// const PIPE_RADIUS = 0.15;
+// const PIPE_COLOR = 0xEAEAEA; // Lighter grey for pipes
+// const PIPE_SEGMENTS = 16;
+// const pipeMaterial = new THREE.MeshStandardMaterial({ color: PIPE_COLOR, roughness: 0.3, metalness: 0.1 });
 const FAN_COLOR = 0x555555;           // Dark grey for fans (used for fanBodyMaterial if specific not set)
 const FAN_FRAME_COLOR = 0x666666;     // Slightly different grey for frame
 const FAN_BLADE_COLOR = 0x444444;     // Darker grey for blades
@@ -49,8 +70,8 @@ const FAN_BLADE_HEIGHT = 0.02; // Renamed from FAN_BLADE_WIDTH for clarity with 
 const FAN_BLADE_THICKNESS = 0.01; // Thickness of the blade
 const NUM_FAN_BLADES = 4;
 const FAN_SPACING_X = GREENHOUSE_WIDTH / 3; // Adjust as needed for 2 fans
-const FAN_SPACING_Y = 0.5; // Vertical spacing between fans in a 2x2 grid
-const GABLE_Y_OFFSET = -1.65; // Fine-tune Y position of fans on gable (top of fan assembly at gable base)
+const FAN_SPACING_Y = 0.6; // Vertical spacing between fans in a 2x2 grid
+const GABLE_Y_OFFSET = -1.35; // Fine-tune Y position of fans on gable (top of fan assembly at gable base)
 const GABLE_Z_OFFSET_FAN = FRAME_THICKNESS / 2 + FAN_FRAME_THICKNESS / 2; // Offset from gable wall surface
 
 // Pipe Tier (Growing Bed) Constants
@@ -70,6 +91,7 @@ const PIPE_TIER_RETAINING_WALL_COLOR = 0xCCCCCC; // Light grey
 const SUPPORT_COLUMN_RADIUS = 0.03;
 const SUPPORT_COLUMN_COLOR = 0x888888; // Grey, similar to frame
 const SUPPORT_COLUMN_SEGMENTS = 12;
+
 
 export const FarmModel: React.FC<FarmModelProps> = ({
   scene,
@@ -280,7 +302,10 @@ export const FarmModel: React.FC<FarmModelProps> = ({
       let length = startLeft.distanceTo(endLeft);
       let center = new THREE.Vector3().addVectors(startLeft, endLeft).multiplyScalar(0.5);
       let rafter = createBeam(new THREE.Vector3(length, FRAME_THICKNESS, FRAME_THICKNESS), center); // Note: size x is length
-      rafter.lookAt(endLeft);
+      // rafter.lookAt(endLeft); // Old incorrect orientation
+      const directionLeft = new THREE.Vector3().subVectors(endLeft, startLeft).normalize();
+      const quaternionLeft = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), directionLeft);
+      rafter.quaternion.copy(quaternionLeft);
       greenhouseGroup.add(rafter);
 
       // Right rafter
@@ -289,7 +314,10 @@ export const FarmModel: React.FC<FarmModelProps> = ({
       length = startRight.distanceTo(endRight);
       center = new THREE.Vector3().addVectors(startRight, endRight).multiplyScalar(0.5);
       rafter = createBeam(new THREE.Vector3(length, FRAME_THICKNESS, FRAME_THICKNESS), center); // Note: size x is length
-      rafter.lookAt(endRight);
+      // rafter.lookAt(endRight); // Old incorrect orientation
+      const directionRight = new THREE.Vector3().subVectors(endRight, startRight).normalize();
+      const quaternionRight = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), directionRight);
+      rafter.quaternion.copy(quaternionRight);
       greenhouseGroup.add(rafter);
     }
 
@@ -309,29 +337,32 @@ export const FarmModel: React.FC<FarmModelProps> = ({
     const roofAngle = Math.atan2(GREENHOUSE_ROOF_PEAK_ADD_HEIGHT, halfWidth);
 
     // Position Y to be on top of frame elements, accounting for slant
-    const roofPanelCenterY = GREENHOUSE_WALL_HEIGHT + (GREENHOUSE_ROOF_PEAK_ADD_HEIGHT / 2) + greenhouseInitialYOffset + (FRAME_THICKNESS / 2) * Math.cos(roofAngle);
+    const roofPanelCenterY = GREENHOUSE_WALL_HEIGHT + (GREENHOUSE_ROOF_PEAK_ADD_HEIGHT / 2) + greenhouseInitialYOffset + FRAME_THICKNESS / 2;
 
     // Left Roof Panel
     const leftRoofPanelGeo = new THREE.PlaneGeometry(roofPanelActualDepth, roofPanelSlantedLength); // Depth along local X, SlantLength along local Y
+    const visualRoofAngle = roofAngle * 0.9; // Make panels visually a bit flatter
     const leftRoofPanelMesh = new THREE.Mesh(leftRoofPanelGeo, wallMaterial);
-    leftRoofPanelMesh.rotation.x = roofAngle; // Slant the panel along its local X-axis (which is depth)
+    leftRoofPanelMesh.rotation.x = visualRoofAngle; // Slant the panel: outer edge down, inner edge up
     
     const leftRoofGroup = new THREE.Group();
     leftRoofGroup.add(leftRoofPanelMesh);
     leftRoofGroup.rotation.y = Math.PI / 2; // Rotate group to align panel's depth (local X) with global Z
-    leftRoofGroup.position.set(-halfWidth / 2, roofPanelCenterY, 0);
+    const leftRoofPanelX = -halfWidth / 2;
+    leftRoofGroup.position.set(leftRoofPanelX, roofPanelCenterY, 0);
     leftRoofGroup.name = "greenhousePart";
     greenhouseGroup.add(leftRoofGroup);
 
     // Right Roof Panel
     const rightRoofPanelGeo = new THREE.PlaneGeometry(roofPanelActualDepth, roofPanelSlantedLength);
     const rightRoofPanelMesh = new THREE.Mesh(rightRoofPanelGeo, wallMaterial);
-    rightRoofPanelMesh.rotation.x = -roofAngle; // Slant the other way
+    rightRoofPanelMesh.rotation.x = visualRoofAngle; // Slant the panel: outer edge down, inner edge up
 
     const rightRoofGroup = new THREE.Group();
     rightRoofGroup.add(rightRoofPanelMesh);
     rightRoofGroup.rotation.y = -Math.PI / 2; // Rotate group to align panel's depth (local X) with global Z
-    rightRoofGroup.position.set(halfWidth / 2, roofPanelCenterY, 0);
+    const rightRoofPanelX = halfWidth / 2;
+    rightRoofGroup.position.set(rightRoofPanelX, roofPanelCenterY, 0);
     rightRoofGroup.name = "greenhousePart";
     greenhouseGroup.add(rightRoofGroup);
     
@@ -356,23 +387,23 @@ export const FarmModel: React.FC<FarmModelProps> = ({
     const fanFrameMaterial = new THREE.MeshStandardMaterial({ color: FAN_FRAME_COLOR, metalness: 0.5, roughness: 0.7 });
     const fanBodyMaterial = new THREE.MeshStandardMaterial({ color: FAN_COLOR, metalness: 0.4, roughness: 0.7 });
     const fanBladeMaterial = new THREE.MeshStandardMaterial({ color: FAN_BLADE_COLOR, metalness: 0.3, roughness: 0.6 });
-    const pipeLength = GREENHOUSE_DEPTH * 0.9;
-    const tierRelativeHeights = [GREENHOUSE_WALL_HEIGHT * 0.3, GREENHOUSE_WALL_HEIGHT * 0.65];
-    const pipesPerTier = 2;
-    const pipeSpacing = GREENHOUSE_WIDTH / (pipesPerTier + 1);
+    // const pipeLength = GREENHOUSE_DEPTH * 0.9;
+    // const tierRelativeHeights = [GREENHOUSE_WALL_HEIGHT * 0.3, GREENHOUSE_WALL_HEIGHT * 0.65];
+    // const pipesPerTier = 2;
+    // const pipeSpacing = GREENHOUSE_WIDTH / (pipesPerTier + 1);
 
-    tierRelativeHeights.forEach(relYPos => {
-      const yPos = relYPos + greenhouseInitialYOffset;
-      for (let i = 0; i < pipesPerTier; i++) {
-        const xPos = -halfWidth + pipeSpacing * (i + 1);
-        const pipeGeo = new THREE.CylinderGeometry(PIPE_RADIUS, PIPE_RADIUS, pipeLength, PIPE_SEGMENTS);
-        const pipe = new THREE.Mesh(pipeGeo, pipeMaterial);
-        pipe.rotation.x = Math.PI / 2;
-        pipe.position.set(xPos, yPos, 0);
-        pipe.castShadow = true; pipe.name = "greenhousePart";
-        greenhouseGroup.add(pipe);
-      }
-    });
+    // tierRelativeHeights.forEach(relYPos => {
+    //   const yPos = relYPos + greenhouseInitialYOffset;
+    //   for (let i = 0; i < pipesPerTier; i++) {
+    //     const xPos = -halfWidth + pipeSpacing * (i + 1);
+    //     const pipeGeo = new THREE.CylinderGeometry(PIPE_RADIUS, PIPE_RADIUS, pipeLength, PIPE_SEGMENTS);
+    //     const pipe = new THREE.Mesh(pipeGeo, pipeMaterial);
+    //     pipe.rotation.x = Math.PI / 2;
+    //     pipe.position.set(xPos, yPos, 0);
+    //     pipe.castShadow = true; pipe.name = "greenhousePart";
+    //     greenhouseGroup.add(pipe);
+    //   }
+    // });
 
     // Fans on the back gable wall (2x3 Grid)
     const backGableFanZ = GREENHOUSE_DEPTH / 2 - GABLE_Z_OFFSET_FAN;
@@ -625,47 +656,67 @@ export const FarmModel: React.FC<FarmModelProps> = ({
         greenhouseGroup.add(columnMesh);
       });
     }
-
-    farmGroupRef.current.add(greenhouseGroup);
+farmGroupRef.current.add(greenhouseGroup);
     // Ensure zones and sensors are drawn on top or correctly depth-tested
     zoneGroupRef.current.renderOrder = 1;
     sensorGroupRef.current.renderOrder = 2;
 
-  }, []); // Runs once to build the static structure
+  }, [scene]); // Runs once to build the static structure, added scene to dependencies as it's used
 
-  // 2. Visualize Zones
+  // 2. Visualize Zones (A/B sections for each tier)
   useEffect(() => {
     if (zoneGroupRef.current) zoneGroupRef.current.clear();
 
-    zones.forEach(zone => {
-      const zoneMaterial = new THREE.MeshStandardMaterial({
-        color: zone.id === selectedZoneId ? SELECTED_ZONE_COLOR : DEFAULT_ZONE_COLOR,
-        transparent: true,
-        opacity: ZONE_OPACITY,
-        side: THREE.DoubleSide,
-        roughness: 0.7,
-        metalness: 0.2,
-      });
+    const tierDepthActual = GREENHOUSE_DEPTH * PIPE_TIER_DEPTH_RATIO;
+    const tierWidthActual = GREENHOUSE_WIDTH * PIPE_TIER_WIDTH_RATIO;
+    const sectionWidth = (tierWidthActual - PIPE_TIER_AISLE_WIDTH) / 2;
+    const zoneHeight = PIPE_TIER_THICKNESS; // Height of the zone box, same as tier thickness
 
-      const zoneGeometry = new THREE.BoxGeometry(zone.size_x, zone.size_y, zone.size_z);
-      const zoneMesh = new THREE.Mesh(zoneGeometry, zoneMaterial);
-      zoneMesh.position.set(zone.position_x, zone.position_y + zone.size_y / 2, zone.position_z);
-      zoneMesh.name = `zone-${zone.id}`;
-      zoneMesh.userData = { type: 'zone', zoneId: zone.id };
-      zoneMesh.castShadow = true; // Zones can cast shadows
-      // zoneMesh.receiveShadow = true; // Zones can also receive shadows, depending on desired effect
-      zoneGroupRef.current.add(zoneMesh);
-    });
+    for (let i = 0; i < NUM_PIPE_TIERS; i++) {
+      const tierBaseY = greenhouseInitialYOffset + PIPE_TIER_INITIAL_Y_OFFSET + i * PIPE_TIER_SPACING_Y;
+      const zonePosZ = 0; // Centered along the depth of the greenhouse for pipe tiers
 
-  }, [zones, selectedZoneId]);
+      // Section A for tier i+1
+      const zoneIdA = `floor-${i + 1}-A`;
+      const positionXA = -(PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
+      const zoneMeshA = createZoneMesh(
+        zoneIdA,
+        sectionWidth, zoneHeight, tierDepthActual,
+        positionXA, tierBaseY, zonePosZ,
+        selectedZoneId
+      );
+      zoneGroupRef.current.add(zoneMeshA);
+
+      // Section B for tier i+1
+      const zoneIdB = `floor-${i + 1}-B`;
+      const positionXB = (PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
+      const zoneMeshB = createZoneMesh(
+        zoneIdB,
+        sectionWidth, zoneHeight, tierDepthActual,
+        positionXB, tierBaseY, zonePosZ,
+        selectedZoneId
+      );
+      zoneGroupRef.current.add(zoneMeshB);
+    }
+  // }, [zones, selectedZoneId]); // Original dependencies
+  // Dependencies should include selectedZoneId for color updates, and any constants used if they could change.
+  // For now, assuming constants are stable and only selectedZoneId triggers re-render of zones for color change.
+  }, [selectedZoneId, NUM_PIPE_TIERS, GREENHOUSE_DEPTH, PIPE_TIER_DEPTH_RATIO, GREENHOUSE_WIDTH, PIPE_TIER_WIDTH_RATIO, PIPE_TIER_AISLE_WIDTH, PIPE_TIER_THICKNESS, greenhouseInitialYOffset, PIPE_TIER_INITIAL_Y_OFFSET, PIPE_TIER_SPACING_Y]);
 
   // 3. Visualize Sensors
   useEffect(() => {
+    console.log('[FarmModel] Sensor useEffect triggered. Zones prop:', zones);
     if (sensorGroupRef.current) sensorGroupRef.current.clear();
 
     zones.forEach(zone => {
+      console.log(`[FarmModel] Inspecting Zone ID: ${zone.id}, Sensors:`, zone.sensors);
       if (zone.sensors && zone.sensors.length > 0) {
         zone.sensors.forEach(async (sensor: Sensor) => {
+          console.log(`[FarmModel] Processing Sensor ID: ${sensor.id}, Status: ${sensor.latest_status}`, sensor);
+          if (sensor.latest_status === 'critical') {
+            // console.warn('🔴 CRITICAL SENSOR DETECTED:', sensor); // Keep console warning if needed, but sensor model is hidden
+          }
+          /* Sensor visualization logic - commented out
           try {
             const sensorModel = await loadSensorModel(sensor.type);
             if (!sensorModel) return;
@@ -677,13 +728,12 @@ export const FarmModel: React.FC<FarmModelProps> = ({
             sensorModel.position.set(worldSensorX, worldSensorY, worldSensorZ);
             sensorModel.name = `sensor-${sensor.id}`;
             sensorModel.userData = { type: 'sensor', sensorId: sensor.id, zoneId: zone.id };
-            sensorModel.castShadow = true; // Sensors can cast shadows
+            sensorModel.castShadow = true;
             sensorModel.traverse(child => {
                 if (child instanceof THREE.Mesh) {
                     child.castShadow = true;
                 }
             });
-
 
             if (sensor.latest_status) {
               const statusColor = sensor.latest_status === 'critical' ? 0xff0000 :
@@ -702,6 +752,7 @@ export const FarmModel: React.FC<FarmModelProps> = ({
           } catch (error) {
             console.error(`❌ FarmModel: Error loading sensor ${sensor.id}:`, error);
           }
+          */
         });
       }
     });

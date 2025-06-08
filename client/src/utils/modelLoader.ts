@@ -1,24 +1,27 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+// import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+// import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 // 모델 로더 인스턴스
-let gltfLoader: GLTFLoader | null = null;
-let dracoLoader: DRACOLoader | null = null;
+// let gltfLoader: GLTFLoader | null = null;
+// let dracoLoader: DRACOLoader | null = null;
 
 // 로더 초기화
+/*
 export const initializeLoaders = () => {
-  if (!gltfLoader) {
-    gltfLoader = new GLTFLoader();
+  // if (!gltfLoader) {
+  //   gltfLoader = new GLTFLoader();
     
-    // DRACO 압축 지원
-    dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath('/draco/');
-    gltfLoader.setDRACOLoader(dracoLoader);
-  }
+  //   // DRACO 압축 지원
+  //   dracoLoader = new DRACOLoader();
+  //   dracoLoader.setDecoderPath('/draco/');
+  //   gltfLoader.setDRACOLoader(dracoLoader);
+  // }
   
-  return { gltfLoader, dracoLoader };
+  // return { gltfLoader, dracoLoader };
+  return { gltfLoader: null, dracoLoader: null }; // Return nulls to avoid breaking loadModel if it were called
 };
+*/
 
 // 모델 캐시
 const modelCache = new Map<string, THREE.Group>();
@@ -31,21 +34,23 @@ export const loadModel = async (path: string): Promise<THREE.Group> => {
     return cachedModel.clone();
   }
 
-  const { gltfLoader } = initializeLoaders();
+  // const { gltfLoader } = initializeLoaders(); // Commented out loader initialization
 
   try {
-    const gltf = await new Promise<any>((resolve, reject) => {
-      gltfLoader!.load(
-        path,
-        (gltf) => resolve(gltf),
-        (progress) => {
-          console.log(`Loading model ${path}: ${(progress.loaded / progress.total * 100)}%`);
-        },
-        (error) => reject(error)
-      );
-    });
+    // const gltf = await new Promise<any>((resolve, reject) => { // Commented out GLTF loading
+    //   gltfLoader!.load(
+    //     path,
+    //     (gltf) => resolve(gltf),
+    //     (progress) => {
+    //       console.log(`Loading model ${path}: ${(progress.loaded / progress.total * 100)}%`);
+    //     },
+    //     (error) => reject(error)
+    //   );
+    // });
 
-    const model = gltf.scene;
+    // const model = gltf.scene; // Commented out model extraction
+    console.warn(`GLTF loading is commented out. Returning fallback for ${path}`);
+    const model = createFallbackModel(path); // Return fallback directly
     
     // 모델 최적화
     optimizeModel(model);
@@ -155,7 +160,7 @@ const createFarmStructure = (group: THREE.Group) => {
     [2.5, 0, 2.5]
   ];
   
-  pillarPositions.forEach(([x, y, z]) => {
+  pillarPositions.forEach(([x, _unusedY, z]) => {
     const pillar = new THREE.Mesh(pillarGeometry, pillarMaterial);
     pillar.position.set(x, levels * levelHeight / 2, z);
     group.add(pillar);

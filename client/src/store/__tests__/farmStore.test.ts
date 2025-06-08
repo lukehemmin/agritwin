@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { useFarmStore } from '../farmStore';
+import { Sensor } from '../../types/sensor.types';
 
 describe('Farm Store', () => {
   beforeEach(() => {
@@ -51,7 +52,7 @@ describe('Farm Store', () => {
   test('sets sensors', () => {
     const { result } = renderHook(() => useFarmStore());
     
-    const mockSensors = [
+    const mockSensors: Sensor[] = [
       {
         id: 'sensor-1',
         name: 'Temperature Sensor',

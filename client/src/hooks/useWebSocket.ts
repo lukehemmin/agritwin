@@ -38,7 +38,7 @@ export const useWebSocket = (): WebSocketHook => {
       });
       
       // 실시간 데이터 상태 업데이트
-      setSensorData(prevData => {
+      setSensorData(() => {
         // 새로운 데이터로 완전히 교체 (실시간 스냅샷)
         return data;
       });

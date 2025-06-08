@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  BarChart3, 
-  TrendingUp, 
   AlertTriangle, 
   Clock, 
   Database,
-  Filter,
   Download,
-  Calendar,
   PieChart,
   Activity
 } from 'lucide-react';
 import { apiService, AnalyticsSummary, Alert } from '../services/api';
-import { RealTimeLineChart } from '../components/charts/RealTimeLineChart';
-import { SensorBarChart } from '../components/charts/SensorBarChart';
-import { StatusDonutChart } from '../components/charts/StatusDonutChart';
 import { Loading } from '../components/common/Loading';
 
 const Analytics: React.FC = () => {
@@ -22,7 +15,6 @@ const Analytics: React.FC = () => {
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'1h' | '6h' | '24h' | '7d'>('24h');
-  const [trends, setTrends] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAnalytics = async () => {
@@ -39,11 +31,11 @@ const Analytics: React.FC = () => {
       setAlerts(alertsData.alerts);
 
       // Fetch trends data
-      const trendsData = await apiService.getTrends({ 
-        period: selectedPeriod,
-        interval: selectedPeriod === '24h' ? 'hourly' : 'minute'
-      });
-      setTrends(trendsData);
+      // const trendsData = await apiService.getTrends({ 
+      //   period: selectedPeriod,
+      //   interval: selectedPeriod === '24h' ? 'hourly' : 'minute'
+      // });
+      // setTrends(trendsData); // trends state removed
 
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
