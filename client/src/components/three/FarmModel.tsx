@@ -44,7 +44,7 @@ const SKY_COLOR = 0x87CEEB; // Sky blue
 const GREENHOUSE_WIDTH = 3.5; // X-axis (across gable end)
 const GREENHOUSE_DEPTH = 5; // Z-axis (along ridge/eaves)
 const GREENHOUSE_WALL_HEIGHT = 2.5; // Y-axis for vertical walls
-const GREENHOUSE_ROOF_PEAK_ADD_HEIGHT = 1.0; // Additional height from wall top to roof peak
+const GREENHOUSE_ROOF_PEAK_ADD_HEIGHT = 0.8; // Additional height from wall top to roof peak (adjusted for a slightly steeper roof than 0.7)
 const FRAME_THICKNESS = 0.08;
 const FRAME_COLOR = 0xC0C0C0; // Silver
 
@@ -332,44 +332,59 @@ export const FarmModel: React.FC<FarmModelProps> = ({
     const rightWall = new THREE.Mesh(sideWallGeo, wallMaterial); rightWall.position.set(halfWidth - FRAME_THICKNESS/2, wallPlaneY, 0); rightWall.rotation.y = Math.PI / 2; rightWall.name="greenhousePart"; greenhouseGroup.add(rightWall);
 
     // Roof Panels (slanted) - Adjust Y positions and size
-    const roofPanelSlantedLength = Math.sqrt(Math.pow(halfWidth, 2) + Math.pow(GREENHOUSE_ROOF_PEAK_ADD_HEIGHT, 2)); // Full slant length between frame centers
-    const roofPanelActualDepth = GREENHOUSE_DEPTH; // Span full depth
+    const ROOF_MATERIAL_COLOR = 0xADD8E6; // 유리/아크릴 틴트와 유사한 밝은 청색
+    const ROOF_OPACITY = 0.3; // 유리에 가깝도록 더 투명하게 설정
+    const roofMaterial = new THREE.MeshStandardMaterial({
+      color: ROOF_MATERIAL_COLOR,
+      opacity: ROOF_OPACITY,
+      transparent: true,
+      side: THREE.DoubleSide, // 양면 렌더링
+      roughness: 0.1,         // 유리에 가깝도록 더 매끄럽게
+      metalness: 0.05,
+    });
+    roofMaterial.name = "GreenhouseRoofMaterial"; // 디버깅용 이름
+
+    // halfWidth, eaveY, ridgeY, GREENHOUSE_ROOF_PEAK_ADD_HEIGHT, GREENHOUSE_DEPTH 변수는 외부 스코프에서 사용 가능
+    const panelSlantedWidth = Math.sqrt(Math.pow(halfWidth, 2) + Math.pow(GREENHOUSE_ROOF_PEAK_ADD_HEIGHT, 2));
     const roofAngle = Math.atan2(GREENHOUSE_ROOF_PEAK_ADD_HEIGHT, halfWidth);
 
-    // Position Y to be on top of frame elements, accounting for slant
-    const roofPanelCenterY = GREENHOUSE_WALL_HEIGHT + (GREENHOUSE_ROOF_PEAK_ADD_HEIGHT / 2) + greenhouseInitialYOffset + FRAME_THICKNESS / 2;
+    // 지붕 패널 지오메트리 (전체 온실 깊이만큼 생성)
+    const roofPanelGeometry = new THREE.PlaneGeometry(panelSlantedWidth, GREENHOUSE_DEPTH);
 
-    // Left Roof Panel
-    const leftRoofPanelGeo = new THREE.PlaneGeometry(roofPanelActualDepth, roofPanelSlantedLength); // Depth along local X, SlantLength along local Y
-    const visualRoofAngle = roofAngle * 0.9; // Make panels visually a bit flatter
-    const leftRoofPanelMesh = new THREE.Mesh(leftRoofPanelGeo, wallMaterial);
-    leftRoofPanelMesh.rotation.x = visualRoofAngle; // Slant the panel: outer edge down, inner edge up
-    
-    const leftRoofGroup = new THREE.Group();
-    leftRoofGroup.add(leftRoofPanelMesh);
-    leftRoofGroup.rotation.y = Math.PI / 2; // Rotate group to align panel's depth (local X) with global Z
-    const leftRoofPanelX = -halfWidth / 2;
-    leftRoofGroup.position.set(leftRoofPanelX, roofPanelCenterY, 0);
-    leftRoofGroup.name = "greenhousePart";
-    greenhouseGroup.add(leftRoofGroup);
+    // 왼쪽 지붕 패널
+    const leftRoofPanel = new THREE.Mesh(roofPanelGeometry, roofMaterial);
+    leftRoofPanel.name = "greenhouseRoofLeft";
+    // 패널 중심 위치 설정
+    // X: -halfWidth와 0의 평균 = -halfWidth / 2
+    // Y: eaveY와 ridgeY의 평균 = (eaveY + ridgeY) / 2
+    // Z: 0 (깊이 방향 중앙)
+    leftRoofPanel.position.set(-halfWidth / 2, (eaveY + ridgeY) / 2, 0);
+    // 회전 적용:
+    // 1. PlaneGeometry의 원래 Y축 (GREENHOUSE_DEPTH 길이)을 전역 Z축과 정렬 (X축 기준 90도 회전)
+    leftRoofPanel.rotation.order = 'ZXY';
+    leftRoofPanel.rotation.x = Math.PI / 2;
+    // 2. 전역 Z축 (첫 번째 회전 후 평면의 원래 Y축에 해당)을 기준으로 기울기 적용
+    leftRoofPanel.rotation.z = roofAngle; // 왼쪽은 양의 각도
+    greenhouseGroup.add(leftRoofPanel);
 
-    // Right Roof Panel
-    const rightRoofPanelGeo = new THREE.PlaneGeometry(roofPanelActualDepth, roofPanelSlantedLength);
-    const rightRoofPanelMesh = new THREE.Mesh(rightRoofPanelGeo, wallMaterial);
-    rightRoofPanelMesh.rotation.x = visualRoofAngle; // Slant the panel: outer edge down, inner edge up
+    // 오른쪽 지붕 패널
+    const rightRoofPanel = new THREE.Mesh(roofPanelGeometry, roofMaterial);
+    rightRoofPanel.name = "greenhouseRoofRight";
+    // 패널 중심 위치 설정
+    // X: halfWidth와 0의 평균 = halfWidth / 2
+    // Y: eaveY와 ridgeY의 평균 = (eaveY + ridgeY) / 2
+    // Z: 0
+    rightRoofPanel.position.set(halfWidth / 2, (eaveY + ridgeY) / 2, 0);
+    // 회전 적용:
+    rightRoofPanel.rotation.order = 'ZXY';
+    rightRoofPanel.rotation.x = Math.PI / 2; // 동일한 첫 번째 회전
+    rightRoofPanel.rotation.z = -roofAngle; // 오른쪽은 음의 각도
+    greenhouseGroup.add(rightRoofPanel);
 
-    const rightRoofGroup = new THREE.Group();
-    rightRoofGroup.add(rightRoofPanelMesh);
-    rightRoofGroup.rotation.y = -Math.PI / 2; // Rotate group to align panel's depth (local X) with global Z
-    const rightRoofPanelX = halfWidth / 2;
-    rightRoofGroup.position.set(rightRoofPanelX, roofPanelCenterY, 0);
-    rightRoofGroup.name = "greenhousePart";
-    greenhouseGroup.add(rightRoofGroup);
-    
     // Gable end walls (triangular part) - Adjust Y positions and vertex definitions
-    const gableShape = new THREE.Shape();
+    const gableShape = new THREE.Shape(); // 복원: 박공벽 모양 정의 (린트 ID: 345ec094-4d73-45e5-a2be-97b69aa9c34d 등 해결)
     // Vertices relative to the shape's origin, adjusted to meet frame centers
-    gableShape.moveTo(-halfWidth + FRAME_THICKNESS * 0.5, GREENHOUSE_WALL_HEIGHT - FRAME_THICKNESS * 0.5); // Bottom-left of triangle
+    gableShape.moveTo(-halfWidth + FRAME_THICKNESS * 0.5, GREENHOUSE_WALL_HEIGHT - FRAME_THICKNESS * 0.5); // Bottom-left of triangle // 복원
     gableShape.lineTo(halfWidth - FRAME_THICKNESS * 0.5, GREENHOUSE_WALL_HEIGHT - FRAME_THICKNESS * 0.5);  // Bottom-right
     gableShape.lineTo(0, GREENHOUSE_WALL_HEIGHT + GREENHOUSE_ROOF_PEAK_ADD_HEIGHT - FRAME_THICKNESS * 0.5); // Top point
     gableShape.closePath();
