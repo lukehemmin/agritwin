@@ -171,8 +171,8 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
           <FarmModel
             scene={scene}
             zones={zones}
-            sensorData={sensorData}
-            selectedZone={selectedZone}
+            selectedZoneId={selectedZone} // Renamed from selectedZone
+            // sensorData prop removed as it's no longer in FarmModelProps
             onZoneClick={onZoneSelect}
             onSensorClick={onSensorSelect}
           />
