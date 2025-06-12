@@ -15,6 +15,13 @@ interface PlantSensorModalProps {
   onClose: () => void;
 }
 
+// ControlModal Component
+interface ControlModalProps {
+  controlData: ControlIconProps | null;
+  onClose: () => void;
+  onToggle: (tier: number, side: number, type: 'lighting' | 'irrigation') => void;
+}
+
 const ZoneInfoModal: React.FC<ZoneInfoModalProps> = ({ zoneData, onClose }) => {
   if (!zoneData) return null;
 
@@ -492,6 +499,176 @@ const PlantSensorModal: React.FC<PlantSensorModalProps> = ({ plantData, onClose 
   );
 };
 
+const ControlModal: React.FC<ControlModalProps> = ({ controlData, onClose, onToggle }) => {
+  if (!controlData) return null;
+
+  const isLighting = controlData.type === 'lighting';
+  const systemName = isLighting ? '조명 시스템' : '급수 시스템';
+  const tierName = `${controlData.tier + 1}층`;
+  const sideName = `구역 ${controlData.side === 0 ? 'A' : 'B'}`;
+  const statusText = controlData.isActive ? 'ON' : 'OFF';
+  const statusColor = controlData.isActive 
+    ? (isLighting ? '#fbbf24' : '#3b82f6') 
+    : '#6b7280';
+
+  const modalStyles = {
+    overlay: {
+      position: 'fixed' as const,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 2000
+    },
+    modal: {
+      background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+      borderRadius: '16px',
+      padding: '24px',
+      width: '400px',
+      maxWidth: '90vw',
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      border: '1px solid #e2e8f0'
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '20px',
+      paddingBottom: '16px',
+      borderBottom: `3px solid ${statusColor}`
+    },
+    closeButton: {
+      background: 'none',
+      border: 'none',
+      fontSize: '24px',
+      cursor: 'pointer',
+      color: '#6b7280',
+      padding: '4px',
+      borderRadius: '4px',
+      transition: 'all 0.2s'
+    },
+    statusBadge: {
+      display: 'inline-block',
+      padding: '6px 12px',
+      borderRadius: '20px',
+      fontSize: '12px',
+      fontWeight: 'bold',
+      backgroundColor: controlData.isActive ? statusColor : '#f3f4f6',
+      color: controlData.isActive ? 'white' : '#6b7280',
+      marginLeft: '12px'
+    },
+    controlSection: {
+      backgroundColor: '#f8fafc',
+      padding: '16px',
+      borderRadius: '12px',
+      marginTop: '16px'
+    },
+    toggleButton: {
+      width: '100%',
+      padding: '12px 24px',
+      borderRadius: '8px',
+      border: 'none',
+      fontSize: '16px',
+      fontWeight: '600',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      backgroundColor: controlData.isActive ? '#ef4444' : statusColor,
+      color: 'white'
+    }
+  };
+
+  return (
+    <div style={modalStyles.overlay} onClick={onClose}>
+      <div style={modalStyles.modal} onClick={(e) => e.stopPropagation()}>
+        <div style={modalStyles.header}>
+          <div>
+            <h2 style={{ margin: 0, color: '#1f2937', fontSize: '20px' }}>
+              {isLighting ? '💡' : '💧'} {systemName}
+            </h2>
+            <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+              {tierName} • {sideName}
+              <span style={modalStyles.statusBadge}>{statusText}</span>
+            </p>
+          </div>
+          <button 
+            onClick={onClose} 
+            style={modalStyles.closeButton}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            ×
+          </button>
+        </div>
+        
+        <div>
+          <h3 style={{ margin: '0 0 12px 0', color: '#1f2937', fontSize: '16px' }}>시스템 정보</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>위치</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}>{tierName} {sideName}</div>
+            </div>
+            <div style={{ padding: '12px', backgroundColor: '#f1f5f9', borderRadius: '8px' }}>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>상태</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: statusColor }}>{statusText}</div>
+            </div>
+          </div>
+
+          {isLighting ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ padding: '12px', backgroundColor: '#fef3c7', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#92400e', marginBottom: '4px' }}>밝기</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e' }}>
+                  {controlData.isActive ? '80%' : '0%'}
+                </div>
+              </div>
+              <div style={{ padding: '12px', backgroundColor: '#fef3c7', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#92400e', marginBottom: '4px' }}>소비전력</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#92400e' }}>
+                  {controlData.isActive ? '45W' : '0W'}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ padding: '12px', backgroundColor: '#dbeafe', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#1e40af', marginBottom: '4px' }}>유량</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af' }}>
+                  {controlData.isActive ? '2.5L/min' : '0L/min'}
+                </div>
+              </div>
+              <div style={{ padding: '12px', backgroundColor: '#dbeafe', borderRadius: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#1e40af', marginBottom: '4px' }}>압력</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e40af' }}>
+                  {controlData.isActive ? '3.2bar' : '0bar'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={modalStyles.controlSection}>
+            <h4 style={{ margin: '0 0 12px 0', color: '#1f2937', fontSize: '14px' }}>제어</h4>
+            <button
+              style={modalStyles.toggleButton}
+              onClick={() => {
+                onToggle(controlData.tier, controlData.side, controlData.type);
+                onClose();
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              {controlData.isActive ? `${systemName} 끄기` : `${systemName} 켜기`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Helper function to create a zone mesh
 function createZoneMesh(id: string, sizeX: number, sizeY: number, sizeZ: number, posX: number, posY: number, posZ: number, currentSelectedZoneId: string | null) {
   const zoneMaterial = new THREE.MeshStandardMaterial({
@@ -547,6 +724,17 @@ interface PlantSensorButtonProps {
   visible: boolean;
   position: { row: number; col: number };
   zoneId: string;
+}
+
+interface ControlIconProps {
+  id: string;
+  type: 'lighting' | 'irrigation';
+  tier: number;
+  side: number;
+  x: number;
+  y: number;
+  visible: boolean;
+  isActive: boolean;
 }
 
 const DEFAULT_ZONE_COLOR = 0x007bff; // Blue - Can be changed to a more earthy tone
@@ -618,8 +806,128 @@ const PLANT_COLORS = {
 };
 
 const PLANT_BASE_HEIGHT = 0.08;
-const PLANTS_PER_ROW = 6;
-const PLANTS_PER_COLUMN = 6;
+const PLANTS_PER_ROW = 4; // 6에서 4로 감소
+const PLANTS_PER_COLUMN = 4; // 6에서 4로 감소
+
+// 식물별 최적 환경 조건
+const PLANT_OPTIMAL_CONDITIONS = {
+  lettuce: { // 상추
+    temperature: { min: 15, max: 22, optimal: 18 },
+    humidity: { min: 60, max: 80, optimal: 70 },
+    soilMoisture: { min: 65, max: 85, optimal: 75 },
+    phLevel: { min: 6.0, max: 7.0, optimal: 6.5 },
+    lightIntensity: { min: 150, max: 300, optimal: 200 }
+  },
+  spinach: { // 시금치
+    temperature: { min: 13, max: 20, optimal: 16 },
+    humidity: { min: 65, max: 85, optimal: 75 },
+    soilMoisture: { min: 70, max: 90, optimal: 80 },
+    phLevel: { min: 6.0, max: 7.5, optimal: 6.8 },
+    lightIntensity: { min: 120, max: 250, optimal: 180 }
+  },
+  kale: { // 케일
+    temperature: { min: 16, max: 24, optimal: 20 },
+    humidity: { min: 60, max: 80, optimal: 70 },
+    soilMoisture: { min: 60, max: 80, optimal: 70 },
+    phLevel: { min: 6.0, max: 7.5, optimal: 6.5 },
+    lightIntensity: { min: 200, max: 400, optimal: 300 }
+  },
+  arugula: { // 루꼴라
+    temperature: { min: 14, max: 21, optimal: 17 },
+    humidity: { min: 55, max: 75, optimal: 65 },
+    soilMoisture: { min: 55, max: 75, optimal: 65 },
+    phLevel: { min: 6.0, max: 7.0, optimal: 6.3 },
+    lightIntensity: { min: 150, max: 280, optimal: 220 }
+  },
+  basil: { // 바질
+    temperature: { min: 20, max: 28, optimal: 24 },
+    humidity: { min: 50, max: 70, optimal: 60 },
+    soilMoisture: { min: 50, max: 70, optimal: 60 },
+    phLevel: { min: 6.0, max: 7.5, optimal: 6.8 },
+    lightIntensity: { min: 250, max: 500, optimal: 350 }
+  },
+  mint: { // 민트
+    temperature: { min: 18, max: 25, optimal: 21 },
+    humidity: { min: 70, max: 90, optimal: 80 },
+    soilMoisture: { min: 75, max: 95, optimal: 85 },
+    phLevel: { min: 6.0, max: 7.0, optimal: 6.5 },
+    lightIntensity: { min: 200, max: 350, optimal: 275 }
+  }
+};
+
+// 현실적인 센서 데이터 생성 함수
+function generateRealisticSensorData(plantType: keyof typeof PLANT_OPTIMAL_CONDITIONS, tier: number, position: { row: number; col: number }) {
+  const conditions = PLANT_OPTIMAL_CONDITIONS[plantType];
+  
+  // 위치 기반 변화 (가장자리는 약간 다른 조건)
+  const edgeEffect = (position.row === 0 || position.row === 3 || position.col === 0 || position.col === 3) ? 0.05 : 0;
+  
+  // 층별 효과 (위층일수록 조금 더 따뜻하고 건조)
+  const tierEffect = tier * 0.02;
+  
+  // 현실적인 범위 내에서 랜덤 생성
+  const temperature = conditions.temperature.optimal + (Math.random() - 0.5) * 4 + tierEffect + edgeEffect * 2;
+  const humidity = conditions.humidity.optimal + (Math.random() - 0.5) * 10 - tierEffect * 5 + edgeEffect * 3;
+  const soilMoisture = conditions.soilMoisture.optimal + (Math.random() - 0.5) * 15 + edgeEffect * 5;
+  const phLevel = conditions.phLevel.optimal + (Math.random() - 0.5) * 0.4;
+  const lightIntensity = conditions.lightIntensity.optimal + (Math.random() - 0.5) * 50;
+  
+  return {
+    temperature: Math.max(10, Math.min(35, temperature)), // 10-35도 범위
+    humidity: Math.max(30, Math.min(95, humidity)), // 30-95% 범위
+    soilMoisture: Math.max(20, Math.min(100, soilMoisture)), // 20-100% 범위
+    phLevel: Math.max(5.5, Math.min(8.0, phLevel)), // 5.5-8.0 범위
+    lightIntensity: Math.max(50, Math.min(600, lightIntensity)) // 50-600 lux 범위
+  };
+}
+
+// 센서 데이터를 기반으로 식물 건강 상태 평가
+function evaluatePlantHealth(plantType: keyof typeof PLANT_OPTIMAL_CONDITIONS, sensorData: any): 'healthy' | 'stressed' | 'sick' | 'dead' {
+  const conditions = PLANT_OPTIMAL_CONDITIONS[plantType];
+  let healthScore = 100;
+  
+  // 각 조건별 건강도 평가
+  const factors = [
+    { value: sensorData.temperature, range: conditions.temperature },
+    { value: sensorData.humidity, range: conditions.humidity },
+    { value: sensorData.soilMoisture, range: conditions.soilMoisture },
+    { value: sensorData.phLevel, range: conditions.phLevel },
+    { value: sensorData.lightIntensity, range: conditions.lightIntensity }
+  ];
+  
+  factors.forEach(factor => {
+    if (factor.value < factor.range.min || factor.value > factor.range.max) {
+      // 범위를 벗어난 경우 큰 감점
+      const deviation = Math.min(
+        Math.abs(factor.value - factor.range.min),
+        Math.abs(factor.value - factor.range.max)
+      );
+      healthScore -= deviation * 3;
+    } else {
+      // 범위 내에서도 최적값과의 차이에 따라 감점
+      const optimalDeviation = Math.abs(factor.value - factor.range.optimal);
+      const maxDeviation = Math.max(
+        factor.range.optimal - factor.range.min,
+        factor.range.max - factor.range.optimal
+      );
+      healthScore -= (optimalDeviation / maxDeviation) * 10;
+    }
+  });
+  
+  // 건강 상태 결정
+  if (healthScore >= 80) return 'healthy';
+  if (healthScore >= 60) return 'stressed';
+  if (healthScore >= 30) return 'sick';
+  return 'dead';
+}
+
+// 건강 상태에 따른 성장 단계 조정
+function adjustGrowthStage(baseGrowthStage: string, healthStatus: 'healthy' | 'stressed' | 'sick' | 'dead'): string {
+  if (healthStatus === 'dead') return 'dead';
+  if (healthStatus === 'sick' && Math.random() > 0.7) return 'dead';
+  if (healthStatus === 'stressed' && baseGrowthStage === 'harvest') return 'mature';
+  return baseGrowthStage;
+}
 
 // Plant creation helper function
 function createRealisticPlant(
@@ -865,6 +1173,66 @@ export const FarmModel: React.FC<FarmModelProps> = ({
   const [plantSensorButtons, setPlantSensorButtons] = useState<PlantSensorButtonProps[]>([]); // 식물 센서 버튼 상태
   const [selectedZoneForModal, setSelectedZoneForModal] = useState<FarmZone | null>(null); // 모달용 선택된 구역 상태
   const [selectedPlantForModal, setSelectedPlantForModal] = useState<PlantSensorButtonProps | null>(null); // 모달용 선택된 식물 상태
+  const [controlIcons, setControlIcons] = useState<ControlIconProps[]>([]); // 제어 아이콘 상태
+  const [selectedControlForModal, setSelectedControlForModal] = useState<ControlIconProps | null>(null); // 제어 모달 상태
+  
+  // 제어 시스템 토글 함수
+  const handleControlToggle = useCallback((tier: number, side: number, type: 'lighting' | 'irrigation') => {
+    if (type === 'lighting') {
+      // LED 조명 상태 변경
+      farmGroupRef.current.traverse((object) => {
+        if (object.userData.type === 'led-chip' && 
+            object.userData.tier === tier && 
+            object.userData.side === side) {
+          const newState = !object.userData.isOn;
+          object.userData.isOn = newState;
+          
+          // LED 재질 변경 (향상된 시각적 구분)
+          if (object instanceof THREE.Mesh) {
+            const ledLightOnMaterial = new THREE.MeshStandardMaterial({ 
+              color: 0xffffdd, 
+              emissive: 0xffdd44,
+              emissiveIntensity: 1.2,
+              metalness: 0.1, 
+              roughness: 0.1 
+            });
+            
+            const ledLightOffMaterial = new THREE.MeshStandardMaterial({ 
+              color: 0x222222, 
+              emissive: 0x000000,
+              emissiveIntensity: 0.0,
+              metalness: 0.5, 
+              roughness: 0.8 
+            });
+            
+            object.material = newState ? ledLightOnMaterial : ledLightOffMaterial;
+          }
+        }
+        
+        // 실제 조명도 토글
+        if (object.userData.type === 'led-light' && 
+            object.userData.tier === tier && 
+            object.userData.side === side) {
+          const newState = !object.userData.isOn;
+          object.userData.isOn = newState;
+          if (object instanceof THREE.SpotLight) {
+            object.intensity = newState ? 0.8 : 0;
+          }
+        }
+      });
+    } else {
+      // 급수 시스템 상태 변경
+      farmGroupRef.current.traverse((object) => {
+        if (object.userData.type === 'irrigation-nozzle' && 
+            object.userData.tier === tier && 
+            object.userData.side === side) {
+          object.userData.isActive = !object.userData.isActive;
+        }
+      });
+    }
+    
+    console.log(`${type} 시스템 토글: ${tier + 1}층 ${side === 0 ? 'A' : 'B'}구역`);
+  }, []);
   
   // 카메라 위치 업데이트를 위한 애니메이션 루프
   const updateButtonPositions = useCallback(() => {
@@ -941,6 +1309,69 @@ export const FarmModel: React.FC<FarmModelProps> = ({
       }
     });
     setPlantSensorButtons(newPlantSensorButtons);
+
+    // 제어 아이콘 위치 업데이트 (LED 조명과 급수 시스템)
+    const newControlIcons: ControlIconProps[] = [];
+    
+    // LED 조명 제어 아이콘들
+    farmGroupRef.current.traverse((object) => {
+      if (object.userData.type === 'led-chip') {
+        const { tier, side, row, col, isOn } = object.userData;
+        
+        // LED 그리드의 중앙 위치만 표시 (2x3 그리드에서 중앙)
+        if (row === 0 && col === 1) { // 중앙 LED만 아이콘 표시
+          const worldPosition = new THREE.Vector3();
+          object.getWorldPosition(worldPosition);
+          
+          // 아이콘을 LED 위쪽에 표시하기 위해 Y 좌표 조정
+          worldPosition.y += 0.1;
+          
+          const screenPosition = worldPosition.clone().project(camera);
+          
+          const x = (screenPosition.x + 1) / 2 * canvasWidth;
+          const y = (-screenPosition.y + 1) / 2 * canvasHeight;
+          const visible = screenPosition.z < 1 && x >= 0 && x <= canvasWidth && y >= 0 && y <= canvasHeight;
+          
+          newControlIcons.push({
+            id: `lighting-${tier}-${side}`,
+            type: 'lighting',
+            tier,
+            side,
+            x, y, visible,
+            isActive: isOn
+          });
+        }
+      }
+    });
+
+    // 급수 시스템 제어 아이콘들
+    farmGroupRef.current.traverse((object) => {
+      if (object.userData.type === 'irrigation-nozzle') {
+        const { tier, side, nozzleIndex, isActive } = object.userData;
+        
+        const worldPosition = new THREE.Vector3();
+        object.getWorldPosition(worldPosition);
+        const screenPosition = worldPosition.clone().project(camera);
+        
+        const x = (screenPosition.x + 1) / 2 * canvasWidth;
+        const y = (-screenPosition.y + 1) / 2 * canvasHeight;
+        const visible = screenPosition.z < 1 && x >= 0 && x <= canvasWidth && y >= 0 && y <= canvasHeight;
+        
+        // 각 베드의 중앙 노즐만 표시 (모든 노즐이 아닌)
+        if (nozzleIndex === 2) { // 중앙 노즐만 아이콘 표시
+          newControlIcons.push({
+            id: `irrigation-${tier}-${side}`,
+            type: 'irrigation',
+            tier,
+            side,
+            x, y, visible,
+            isActive
+          });
+        }
+      }
+    });
+
+    setControlIcons(newControlIcons);
   }, [camera, zones]);
 
   // Add main groups and basic scene setup
@@ -989,9 +1420,9 @@ export const FarmModel: React.FC<FarmModelProps> = ({
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8); // Simulates sunlight
     directionalLight.position.set(20, 30, 20); // Adjust position for desired shadow direction
     directionalLight.castShadow = true;
-    // Configure shadow properties for better quality (optional, can be performance intensive)
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
+    // 그림자 품질 최적화: 맵 크기 감소로 성능 향상
+    directionalLight.shadow.mapSize.width = 512;  // 1024에서 512로 감소
+    directionalLight.shadow.mapSize.height = 512; // 1024에서 512로 감소
     directionalLight.shadow.camera.near = 0.5;
     directionalLight.shadow.camera.far = 500;
     directionalLight.shadow.camera.left = -100;
@@ -1539,19 +1970,30 @@ export const FarmModel: React.FC<FarmModelProps> = ({
         // Add realistic plants to Bed A
         for (let row = 0; row < PLANTS_PER_ROW; row++) {
           for (let col = 0; col < PLANTS_PER_COLUMN; col++) {
-            // 임시 성장 단계 및 건강 상태 (실제로는 백엔드에서 가져와야 함)
-            const growthStages: Array<'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead'> = ['seed', 'sprout', 'growing', 'mature', 'harvest'];
-            const healthStatuses: Array<'healthy' | 'stressed' | 'sick' | 'dead'> = ['healthy', 'stressed', 'sick'];
+            // 현실적인 센서 데이터 생성
+            const sensorData = generateRealisticSensorData(tierPlants.A as keyof typeof PLANT_OPTIMAL_CONDITIONS, i, { row, col });
             
-            const randomGrowthStage = growthStages[Math.floor(Math.random() * growthStages.length)];
-            const randomHealthStatus = healthStatuses[Math.floor(Math.random() * healthStatuses.length)];
-            const randomSizeMultiplier = 0.8 + Math.random() * 0.4;
+            // 센서 데이터를 기반으로 건강 상태 평가
+            const healthStatus = evaluatePlantHealth(tierPlants.A as keyof typeof PLANT_OPTIMAL_CONDITIONS, sensorData);
+            
+            // 기본 성장 단계 (실제로는 시간에 따라 변화)
+            const growthStages: Array<'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead'> = ['growing', 'mature', 'harvest'];
+            const baseGrowthStage = growthStages[Math.floor(Math.random() * growthStages.length)];
+            
+            // 건강 상태에 따라 성장 단계 조정
+            const finalGrowthStage = adjustGrowthStage(baseGrowthStage, healthStatus) as 'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead';
+            
+            // 건강 상태에 따른 크기 조정
+            let sizeMultiplier = 0.8 + Math.random() * 0.4;
+            if (healthStatus === 'stressed') sizeMultiplier *= 0.8;
+            if (healthStatus === 'sick') sizeMultiplier *= 0.6;
+            if (healthStatus === 'dead') sizeMultiplier *= 0.4;
             
             const plantGroup = createRealisticPlant(
               tierPlants.A as keyof typeof PLANT_COLORS,
-              randomGrowthStage,
-              randomHealthStatus,
-              randomSizeMultiplier
+              finalGrowthStage,
+              healthStatus,
+              sizeMultiplier
             );
             
             const plantX = bedAMesh.position.x - (individualBedWidth / 2) + (col + 1) * (individualBedWidth / (PLANTS_PER_COLUMN + 1));
@@ -1568,23 +2010,26 @@ export const FarmModel: React.FC<FarmModelProps> = ({
             
             plantGroup.castShadow = true;
             plantGroup.receiveShadow = true;
-            plantGroup.name = `plant-${i}-A-${row}-${col}-${tierPlants.A}-${randomGrowthStage}-${randomHealthStatus}`;
+            plantGroup.name = `plant-${i}-A-${row}-${col}-${tierPlants.A}-${finalGrowthStage}-${healthStatus}`;
             plantGroup.userData = {
               type: 'plant',
               plantType: tierPlants.A,
-              growthStage: randomGrowthStage,
-              healthStatus: randomHealthStatus,
+              growthStage: finalGrowthStage,
+              healthStatus: healthStatus,
               zoneId: `floor-${i + 1}-A`,
-              position: { row, col }
+              position: { row, col },
+              sensorData: sensorData // 센서 데이터 저장
             };
             
-            // Apply shadow to all children
-            plantGroup.traverse((child) => {
-              if (child instanceof THREE.Mesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-              }
-            });
+            // 그림자 최적화: 일부 식물만 그림자 적용
+            if ((row + col) % 3 === 0) { // 3개 중 1개만 그림자 활성화
+              plantGroup.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.castShadow = true;
+                  child.receiveShadow = true;
+                }
+              });
+            }
             
             greenhouseGroup.add(plantGroup);
           }
@@ -1593,19 +2038,30 @@ export const FarmModel: React.FC<FarmModelProps> = ({
         // Add realistic plants to Bed B
         for (let row = 0; row < PLANTS_PER_ROW; row++) {
           for (let col = 0; col < PLANTS_PER_COLUMN; col++) {
-            // 임시 성장 단계 및 건강 상태 (실제로는 백엔드에서 가져와야 함)
-            const growthStages: Array<'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead'> = ['seed', 'sprout', 'growing', 'mature', 'harvest'];
-            const healthStatuses: Array<'healthy' | 'stressed' | 'sick' | 'dead'> = ['healthy', 'stressed', 'sick'];
+            // 현실적인 센서 데이터 생성
+            const sensorData = generateRealisticSensorData(tierPlants.B as keyof typeof PLANT_OPTIMAL_CONDITIONS, i, { row, col });
             
-            const randomGrowthStage = growthStages[Math.floor(Math.random() * growthStages.length)];
-            const randomHealthStatus = healthStatuses[Math.floor(Math.random() * healthStatuses.length)];
-            const randomSizeMultiplier = 0.8 + Math.random() * 0.4;
+            // 센서 데이터를 기반으로 건강 상태 평가
+            const healthStatus = evaluatePlantHealth(tierPlants.B as keyof typeof PLANT_OPTIMAL_CONDITIONS, sensorData);
+            
+            // 기본 성장 단계 (실제로는 시간에 따라 변화)
+            const growthStages: Array<'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead'> = ['growing', 'mature', 'harvest'];
+            const baseGrowthStage = growthStages[Math.floor(Math.random() * growthStages.length)];
+            
+            // 건강 상태에 따라 성장 단계 조정
+            const finalGrowthStage = adjustGrowthStage(baseGrowthStage, healthStatus) as 'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead';
+            
+            // 건강 상태에 따른 크기 조정
+            let sizeMultiplier = 0.8 + Math.random() * 0.4;
+            if (healthStatus === 'stressed') sizeMultiplier *= 0.8;
+            if (healthStatus === 'sick') sizeMultiplier *= 0.6;
+            if (healthStatus === 'dead') sizeMultiplier *= 0.4;
             
             const plantGroup = createRealisticPlant(
               tierPlants.B as keyof typeof PLANT_COLORS,
-              randomGrowthStage,
-              randomHealthStatus,
-              randomSizeMultiplier
+              finalGrowthStage,
+              healthStatus,
+              sizeMultiplier
             );
             
             const plantX = bedBMesh.position.x - (individualBedWidth / 2) + (col + 1) * (individualBedWidth / (PLANTS_PER_COLUMN + 1));
@@ -1622,29 +2078,345 @@ export const FarmModel: React.FC<FarmModelProps> = ({
             
             plantGroup.castShadow = true;
             plantGroup.receiveShadow = true;
-            plantGroup.name = `plant-${i}-B-${row}-${col}-${tierPlants.B}-${randomGrowthStage}-${randomHealthStatus}`;
+            plantGroup.name = `plant-${i}-B-${row}-${col}-${tierPlants.B}-${finalGrowthStage}-${healthStatus}`;
             plantGroup.userData = {
               type: 'plant',
               plantType: tierPlants.B,
-              growthStage: randomGrowthStage,
-              healthStatus: randomHealthStatus,
+              growthStage: finalGrowthStage,
+              healthStatus: healthStatus,
               zoneId: `floor-${i + 1}-B`,
-              position: { row, col }
+              position: { row, col },
+              sensorData: sensorData // 센서 데이터 저장
             };
             
-            // Apply shadow to all children
-            plantGroup.traverse((child) => {
-              if (child instanceof THREE.Mesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-              }
-            });
+            // 그림자 최적화: 일부 식물만 그림자 적용
+            if ((row + col) % 3 === 0) { // 3개 중 1개만 그림자 활성화
+              plantGroup.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  child.castShadow = true;
+                  child.receiveShadow = true;
+                }
+              });
+            }
             
             greenhouseGroup.add(plantGroup);
           }
         }
       }
     }
+
+    // Add LED Lighting System (Grid Pattern like Sprinklers)
+    const addLEDLightingSystem = () => {
+      const ledLightGroup = new THREE.Group();
+      ledLightGroup.name = 'LED_Lighting_System';
+
+      // LED 조명 재질
+      const ledFrameMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x333333, 
+        metalness: 0.7, 
+        roughness: 0.3 
+      });
+      
+      // LED 켜진 상태와 꺼진 상태 재질 (더 명확한 구분)
+      const ledLightOnMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xffffdd, 
+        emissive: 0xffdd44,
+        emissiveIntensity: 1.2, // 더욱 밝게
+        metalness: 0.1, 
+        roughness: 0.1 
+      });
+      
+      const ledLightOffMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x222222, 
+        emissive: 0x000000,
+        emissiveIntensity: 0.0,
+        metalness: 0.5, 
+        roughness: 0.8 
+      });
+
+      // 파이프 재질
+      const pipeMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x666666, 
+        metalness: 0.8, 
+        roughness: 0.2 
+      });
+
+      // 각 층마다 LED 조명 그리드 추가
+      for (let tier = 0; tier < NUM_PIPE_TIERS; tier++) {
+        const tierY = greenhouseInitialYOffset + PIPE_TIER_INITIAL_Y_OFFSET + (tier * PIPE_TIER_SPACING_Y) + PIPE_TIER_THICKNESS + 0.4;
+        
+        // 각 베드(A, B)마다 LED 그리드 설치
+        [-1, 1].forEach((side, sideIndex) => {
+          const bedCenterX = side * (PIPE_TIER_AISLE_WIDTH / 2 + individualBedWidth / 2);
+          
+          // LED 지지 파이프 시스템 (더 현실적)
+          const frameWidth = individualBedWidth * 0.9;
+          const frameDepth = tierDepth * 0.9;
+          const pipeRadius = 0.015; // 파이프 반지름
+          
+          // 메인 지지 파이프 (가로)
+          const mainPipeGeometry = new THREE.CylinderGeometry(pipeRadius, pipeRadius, frameWidth, 8);
+          const frontMainPipe = new THREE.Mesh(mainPipeGeometry, pipeMaterial);
+          frontMainPipe.rotation.z = Math.PI / 2;
+          frontMainPipe.position.set(bedCenterX, tierY, -frameDepth/2);
+          frontMainPipe.castShadow = false;
+          frontMainPipe.name = `led-main-pipe-front-tier-${tier}-side-${sideIndex}`;
+          ledLightGroup.add(frontMainPipe);
+          
+          const backMainPipe = new THREE.Mesh(mainPipeGeometry, pipeMaterial);
+          backMainPipe.rotation.z = Math.PI / 2;
+          backMainPipe.position.set(bedCenterX, tierY, frameDepth/2);
+          backMainPipe.castShadow = false;
+          backMainPipe.name = `led-main-pipe-back-tier-${tier}-side-${sideIndex}`;
+          ledLightGroup.add(backMainPipe);
+          
+          // LED 배치용 가로 파이프들 (3개)
+          const ledPipeGeometry = new THREE.CylinderGeometry(pipeRadius * 0.7, pipeRadius * 0.7, frameWidth * 0.8, 6);
+          for (let pipeIndex = 0; pipeIndex < 2; pipeIndex++) {
+            const pipeZ = -frameDepth/3 + (pipeIndex * frameDepth/3);
+            const ledPipe = new THREE.Mesh(ledPipeGeometry, pipeMaterial);
+            ledPipe.rotation.z = Math.PI / 2;
+            ledPipe.position.set(bedCenterX, tierY - 0.02, pipeZ);
+            ledPipe.castShadow = false;
+            ledPipe.name = `led-pipe-tier-${tier}-side-${sideIndex}-${pipeIndex}`;
+            ledLightGroup.add(ledPipe);
+          }
+          
+          // 수직 지지대 (4개 모서리)
+          const supportGeometry = new THREE.CylinderGeometry(pipeRadius, pipeRadius, 0.3, 6);
+          const supportPositions = [
+            { x: bedCenterX - frameWidth/2.5, z: -frameDepth/2.5 },
+            { x: bedCenterX + frameWidth/2.5, z: -frameDepth/2.5 },
+            { x: bedCenterX - frameWidth/2.5, z: frameDepth/2.5 },
+            { x: bedCenterX + frameWidth/2.5, z: frameDepth/2.5 }
+          ];
+          
+          supportPositions.forEach((pos, supportIndex) => {
+            const support = new THREE.Mesh(supportGeometry, pipeMaterial);
+            support.position.set(pos.x, tierY + 0.15, pos.z);
+            support.castShadow = false;
+            support.name = `led-support-tier-${tier}-side-${sideIndex}-${supportIndex}`;
+            ledLightGroup.add(support);
+          });
+
+          // LED 그리드 최적화 (2x3 배치로 감소)
+          const ledRowCount = 2; // 세로 방향 감소
+          const ledColCount = 3; // 가로 방향 감소
+          const ledSpacingX = frameWidth * 0.8 / (ledColCount + 1);
+          const ledSpacingZ = frameDepth / (ledRowCount + 1);
+          
+          for (let row = 0; row < ledRowCount; row++) {
+            for (let col = 0; col < ledColCount; col++) {
+              const ledX = bedCenterX - (frameWidth * 0.8)/2 + (col + 1) * ledSpacingX;
+              const ledZ = -frameDepth/2 + (row + 1) * ledSpacingZ;
+              const nearestPipeZ = row === 0 ? -frameDepth/3 : frameDepth/3;
+              
+              // LED 하우징 (더 현실적인 모양)
+              const ledHousingGeometry = new THREE.CylinderGeometry(0.025, 0.03, 0.04, 8);
+              const ledHousing = new THREE.Mesh(ledHousingGeometry, ledFrameMaterial);
+              ledHousing.position.set(ledX, tierY - 0.03, nearestPipeZ);
+              ledHousing.castShadow = false;
+              ledHousing.name = `led-housing-tier-${tier}-side-${sideIndex}-${row}-${col}`;
+              ledLightGroup.add(ledHousing);
+              
+              // LED 칩/모듈 (기본값: 켜진 상태, 더 밝고 구분되게)
+              const ledGeometry = new THREE.SphereGeometry(0.02, 8, 6);
+              const isLedOn = true; // 기본적으로 켜진 상태
+              const ledMesh = new THREE.Mesh(ledGeometry, isLedOn ? ledLightOnMaterial : ledLightOffMaterial);
+              ledMesh.position.set(ledX, tierY - 0.045, nearestPipeZ);
+              ledMesh.name = `led-chip-tier-${tier}-side-${sideIndex}-${row}-${col}`;
+              ledMesh.userData = {
+                type: 'led-chip',
+                tier,
+                side: sideIndex,
+                row,
+                col,
+                isOn: isLedOn
+              };
+              ledLightGroup.add(ledMesh);
+              
+              // LED와 파이프 연결부 (작은 브래킷)
+              const bracketGeometry = new THREE.BoxGeometry(0.01, 0.015, 0.01);
+              const bracket = new THREE.Mesh(bracketGeometry, pipeMaterial);
+              bracket.position.set(ledX, tierY - 0.025, nearestPipeZ);
+              bracket.castShadow = false;
+              bracket.name = `led-bracket-tier-${tier}-side-${sideIndex}-${row}-${col}`;
+              ledLightGroup.add(bracket);
+
+              // LED 조명 최적화: 중앙 LED만 실제 조명으로 설정
+              if (row === 0 && col === 1) { // 중앙 LED만 실제 광원 추가 (2x3 그리드에 맞게 조정)
+                const ledLight = new THREE.SpotLight(0xffffff, 0.8, 3.0, Math.PI / 3, 0.5);
+                ledLight.position.set(ledX, tierY, ledZ);
+                ledLight.target.position.set(ledX, tierY - 1, ledZ);
+                ledLight.castShadow = false; // 그림자 비활성화로 성능 향상
+                ledLight.name = `led-light-tier-${tier}-side-${sideIndex}-${row}-${col}`;
+                ledLight.userData = { 
+                  type: 'led-light', 
+                  tier, 
+                  side: sideIndex, 
+                  row, 
+                  col,
+                  isOn: true  // 기본적으로 켜져있음
+                };
+                ledLightGroup.add(ledLight);
+                ledLightGroup.add(ledLight.target);
+              }
+            }
+          }
+
+          // 전력 케이블 (메인 파이프를 따라 간단하게)
+          const cableGeometry = new THREE.CylinderGeometry(0.005, 0.005, frameWidth * 0.9, 6);
+          const cableMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 }); // MeshBasicMaterial로 성능 향상
+          
+          const powerCable = new THREE.Mesh(cableGeometry, cableMaterial);
+          powerCable.rotation.z = Math.PI / 2;
+          powerCable.position.set(bedCenterX, tierY + 0.01, 0);
+          powerCable.name = `led-power-cable-tier-${tier}-side-${sideIndex}`;
+          ledLightGroup.add(powerCable);
+        });
+      }
+
+      greenhouseGroup.add(ledLightGroup);
+    };
+
+    // Add Irrigation/Misting System
+    const addIrrigationSystem = () => {
+      const irrigationGroup = new THREE.Group();
+      irrigationGroup.name = 'Irrigation_System';
+
+      // 관개 시스템 재질
+      const pipeMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x555555, 
+        metalness: 0.6, 
+        roughness: 0.4 
+      });
+      const nozzleMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x888888, 
+        metalness: 0.8, 
+        roughness: 0.2 
+      });
+
+      // 메인 급수 파이프 (온실 천장을 따라)
+      const mainPipeGeometry = new THREE.CylinderGeometry(0.03, 0.03, GREENHOUSE_DEPTH * 0.9, 8);
+      const mainPipe = new THREE.Mesh(mainPipeGeometry, pipeMaterial);
+      mainPipe.rotation.x = Math.PI / 2;
+      mainPipe.position.set(0, GREENHOUSE_WALL_HEIGHT + greenhouseInitialYOffset - 0.2, 0);
+      mainPipe.castShadow = true;
+      mainPipe.name = 'main-water-pipe';
+      irrigationGroup.add(mainPipe);
+
+      // 각 층마다 관개 시스템 추가
+      for (let tier = 0; tier < NUM_PIPE_TIERS; tier++) {
+        const tierY = greenhouseInitialYOffset + PIPE_TIER_INITIAL_Y_OFFSET + (tier * PIPE_TIER_SPACING_Y) + PIPE_TIER_THICKNESS + 0.5;
+        
+        // 각 베드(A, B)마다 분사 시스템
+        [-1, 1].forEach((side, sideIndex) => {
+          const bedCenterX = side * (PIPE_TIER_AISLE_WIDTH / 2 + individualBedWidth / 2);
+          
+          // 분배 파이프 (베드 위를 가로지름)
+          const distributionPipe = new THREE.Mesh(mainPipeGeometry.clone(), pipeMaterial);
+          distributionPipe.rotation.x = Math.PI / 2;
+          distributionPipe.position.set(bedCenterX, tierY, 0);
+          distributionPipe.name = `distribution-pipe-tier-${tier}-side-${sideIndex}`;
+          irrigationGroup.add(distributionPipe);
+
+          // 메인 파이프에서 분배 파이프로 연결하는 수직 파이프
+          const connectingPipeGeometry = new THREE.CylinderGeometry(0.02, 0.02, tierY - (GREENHOUSE_WALL_HEIGHT + greenhouseInitialYOffset - 0.2), 8);
+          const connectingPipe = new THREE.Mesh(connectingPipeGeometry, pipeMaterial);
+          connectingPipe.position.set(bedCenterX, (tierY + (GREENHOUSE_WALL_HEIGHT + greenhouseInitialYOffset - 0.2)) / 2, 0);
+          connectingPipe.name = `connecting-pipe-tier-${tier}-side-${sideIndex}`;
+          irrigationGroup.add(connectingPipe);
+
+          // 미스트 노즐들
+          const nozzleCount = 6;
+          const nozzleSpacing = (tierDepth * 0.8) / (nozzleCount - 1);
+          
+          for (let nozzleIndex = 0; nozzleIndex < nozzleCount; nozzleIndex++) {
+            const nozzleZ = -(tierDepth * 0.4) + (nozzleIndex * nozzleSpacing);
+            
+            // 노즐 헤드
+            const nozzleGeometry = new THREE.SphereGeometry(0.02, 8, 6);
+            const nozzleMesh = new THREE.Mesh(nozzleGeometry, nozzleMaterial);
+            nozzleMesh.position.set(bedCenterX, tierY - 0.05, nozzleZ);
+            nozzleMesh.name = `mist-nozzle-tier-${tier}-side-${sideIndex}-${nozzleIndex}`;
+            nozzleMesh.userData = { 
+              type: 'irrigation-nozzle', 
+              tier, 
+              side: sideIndex, 
+              nozzleIndex,
+              isActive: Math.random() > 0.7  // 30% 확률로 활성 상태
+            };
+            irrigationGroup.add(nozzleMesh);
+
+            // 노즐에서 파이프로 연결하는 작은 파이프
+            const nozzleConnectorGeometry = new THREE.CylinderGeometry(0.005, 0.005, 0.08, 6);
+            const nozzleConnector = new THREE.Mesh(nozzleConnectorGeometry, pipeMaterial);
+            nozzleConnector.position.set(bedCenterX, tierY - 0.02, nozzleZ);
+            nozzleConnector.name = `nozzle-connector-tier-${tier}-side-${sideIndex}-${nozzleIndex}`;
+            irrigationGroup.add(nozzleConnector);
+
+            // 물방울 효과 최적화: 활성 노즐 중 일부만 물방울 표시
+            if (nozzleMesh.userData.isActive && nozzleIndex % 2 === 0) { // 2개 중 1개만 물방울 표시
+              const waterDropGeometry = new THREE.SphereGeometry(0.004, 4, 3); // 더 간단한 geometry
+              const waterDropMaterial = new THREE.MeshBasicMaterial({ // MeshStandardMaterial 대신 MeshBasicMaterial 사용
+                color: 0x4488ff, 
+                transparent: true, 
+                opacity: 0.7
+              });
+              const waterDrop = new THREE.Mesh(waterDropGeometry, waterDropMaterial);
+              waterDrop.position.set(
+                bedCenterX,
+                tierY - 0.08,
+                nozzleZ
+              );
+              waterDrop.name = `water-drop-tier-${tier}-side-${sideIndex}-${nozzleIndex}`;
+              waterDrop.userData = { 
+                type: 'water-drop', 
+                parentNozzle: `mist-nozzle-tier-${tier}-side-${sideIndex}-${nozzleIndex}` 
+              };
+              irrigationGroup.add(waterDrop);
+            }
+          }
+        });
+      }
+
+      // 물 탱크 (온실 한쪽 모서리에)
+      const tankGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.8, 12);
+      const tankMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x2266aa, 
+        metalness: 0.3, 
+        roughness: 0.7 
+      });
+      const waterTank = new THREE.Mesh(tankGeometry, tankMaterial);
+      waterTank.position.set(
+        -GREENHOUSE_WIDTH / 2 + 0.5, 
+        greenhouseInitialYOffset + 0.4, 
+        -GREENHOUSE_DEPTH / 2 + 0.5
+      );
+      waterTank.castShadow = false; // 그림자 비활성화
+      waterTank.receiveShadow = false;
+      waterTank.name = 'water-tank';
+      irrigationGroup.add(waterTank);
+
+      // 탱크에서 메인 파이프로 연결하는 펌프 및 파이프
+      const pumpPipeGeometry = new THREE.CylinderGeometry(0.025, 0.025, 1.5, 8);
+      const pumpPipe = new THREE.Mesh(pumpPipeGeometry, pipeMaterial);
+      pumpPipe.rotation.z = Math.PI / 4;
+      pumpPipe.position.set(
+        waterTank.position.x + 0.5, 
+        waterTank.position.y + 0.6, 
+        waterTank.position.z
+      );
+      pumpPipe.name = 'pump-pipe';
+      irrigationGroup.add(pumpPipe);
+
+      greenhouseGroup.add(irrigationGroup);
+    };
+
+    // 조명과 관개 시스템 추가
+    addLEDLightingSystem();
+    addIrrigationSystem();
+
 farmGroupRef.current.add(greenhouseGroup);
     // Ensure zones and sensors are drawn on top or correctly depth-tested
     zoneGroupRef.current.renderOrder = 1;
@@ -1734,11 +2506,11 @@ farmGroupRef.current.add(greenhouseGroup);
     let lastCameraRotation = camera.rotation.clone();
 
     const checkCameraMovement = () => {
-      // 더 민감한 카메라 움직임 감지 (0.01 -> 0.001)
-      if (camera.position.distanceTo(lastCameraPosition) > 0.001 || 
-          Math.abs(camera.rotation.x - lastCameraRotation.x) > 0.001 ||
-          Math.abs(camera.rotation.y - lastCameraRotation.y) > 0.001 ||
-          Math.abs(camera.rotation.z - lastCameraRotation.z) > 0.001) {
+      // 카메라 업데이트 최적화: 덜 빈번한 업데이트 (0.001 -> 0.01)
+      if (camera.position.distanceTo(lastCameraPosition) > 0.01 || 
+          Math.abs(camera.rotation.x - lastCameraRotation.x) > 0.01 ||
+          Math.abs(camera.rotation.y - lastCameraRotation.y) > 0.01 ||
+          Math.abs(camera.rotation.z - lastCameraRotation.z) > 0.01) {
         
         updateButtonPositions();
         lastCameraPosition = camera.position.clone();
@@ -1756,6 +2528,21 @@ farmGroupRef.current.add(greenhouseGroup);
       }
     };
   }, [camera, updateButtonPositions]);
+  
+  // 윈도우 리사이즈에 따른 버튼 위치 업데이트
+  useEffect(() => {
+    const handleWindowResize = () => {
+      // 리사이즈 후 약간의 지연을 두어 렌더링이 완료된 후 버튼 위치 업데이트
+      setTimeout(updateButtonPositions, 50);
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+    };
+  }, [updateButtonPositions]);
+  
   // 카메라 업데이트 트리거에 따른 버튼 위치 업데이트
   useEffect(() => {
     if (cameraUpdateTrigger !== undefined) {
@@ -2000,6 +2787,58 @@ farmGroupRef.current.add(greenhouseGroup);
         );
       })}
       
+      {/* 제어 아이콘들 (조명 및 급수 시스템) */}
+      {controlIcons.map(controlIcon => {
+        if (!controlIcon.visible) return null;
+        
+        const isLighting = controlIcon.type === 'lighting';
+        const iconColor = controlIcon.isActive 
+          ? (isLighting ? '#fbbf24' : '#3b82f6') // 활성: 노란색(조명) 또는 파란색(급수)
+          : '#6b7280'; // 비활성: 회색
+        const iconBgColor = controlIcon.isActive ? '#ffffff' : '#f3f4f6';
+        const iconEmoji = isLighting ? '💡' : '💧';
+        
+        return (
+          <div
+            key={controlIcon.id}
+            style={{
+              position: 'absolute',
+              left: `${controlIcon.x}px`,
+              top: `${controlIcon.y}px`,
+              transform: 'translate(-50%, -50%)',
+              width: '32px',
+              height: '32px',
+              backgroundColor: iconBgColor,
+              border: `2px solid ${iconColor}`,
+              borderRadius: '8px',
+              cursor: 'pointer',
+              zIndex: 1001,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '14px',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.15)';
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+            }}
+            onClick={() => {
+              console.log(`${controlIcon.type} control clicked:`, controlIcon);
+              setSelectedControlForModal(controlIcon);
+            }}
+            title={`${isLighting ? '조명' : '급수'} 제어 - ${controlIcon.tier + 1}층 ${controlIcon.side === 0 ? 'A' : 'B'}구역 (${controlIcon.isActive ? 'ON' : 'OFF'})`}
+          >
+            {iconEmoji}
+          </div>
+        );
+      })}
+      
       {/* 구역 모달 */}
       {selectedZoneForModal && (
         <ZoneInfoModal 
@@ -2013,6 +2852,15 @@ farmGroupRef.current.add(greenhouseGroup);
         <PlantSensorModal 
           plantData={selectedPlantForModal} 
           onClose={() => setSelectedPlantForModal(null)} 
+        />
+      )}
+      
+      {/* 제어 시스템 모달 */}
+      {selectedControlForModal && (
+        <ControlModal 
+          controlData={selectedControlForModal} 
+          onClose={() => setSelectedControlForModal(null)}
+          onToggle={handleControlToggle}
         />
       )}
     </>

@@ -14,7 +14,8 @@
       "Bash(npm run typecheck:*)",
       "Bash(npm run:*)",
       "Bash(rg:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

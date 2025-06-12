@@ -1,0 +1,129 @@
+import React, { useEffect, useState } from 'react';
+import { X, AlertTriangle, Info, CheckCircle } from 'lucide-react';
+
+export interface ToastNotification {
+  id: string;
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+  timestamp: string;
+  autoClose?: boolean;
+  duration?: number;
+}
+
+interface NotificationToastProps {
+  notifications: ToastNotification[];
+  onClose: (id: string) => void;
+  onClickNotification?: (id: string) => void;
+}
+
+export const NotificationToast: React.FC<NotificationToastProps> = ({
+  notifications,
+  onClose,
+  onClickNotification
+}) => {
+  const [visibleNotifications, setVisibleNotifications] = useState<ToastNotification[]>([]);
+
+  useEffect(() => {
+    setVisibleNotifications(notifications);
+  }, [notifications]);
+
+  useEffect(() => {
+    // Auto-close notifications after their duration
+    notifications.forEach(notification => {
+      if (notification.autoClose !== false) {
+        const duration = notification.duration || 5000;
+        const timer = setTimeout(() => {
+          onClose(notification.id);
+        }, duration);
+
+        return () => clearTimeout(timer);
+      }
+    });
+  }, [notifications, onClose]);
+
+  const getToastIcon = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+      case 'warning':
+        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      case 'info':
+        return <Info className="w-5 h-5 text-blue-500" />;
+      default:
+        return <CheckCircle className="w-5 h-5 text-green-500" />;
+    }
+  };
+
+  const getToastStyle = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return 'bg-red-50 border-red-200 shadow-red-100';
+      case 'warning':
+        return 'bg-yellow-50 border-yellow-200 shadow-yellow-100';
+      case 'info':
+        return 'bg-blue-50 border-blue-200 shadow-blue-100';
+      default:
+        return 'bg-green-50 border-green-200 shadow-green-100';
+    }
+  };
+
+  if (visibleNotifications.length === 0) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+      {visibleNotifications.map((notification, index) => (
+        <div
+          key={notification.id}
+          className={`
+            border rounded-lg shadow-lg p-4 transform transition-all duration-300 ease-out
+            ${getToastStyle(notification.severity)}
+            ${index === 0 ? 'animate-slide-in' : ''}
+            cursor-pointer hover:shadow-xl
+          `}
+          style={{
+            animation: index === 0 ? 'slideIn 0.3s ease-out' : 'none',
+            transform: `translateY(${index * 4}px) scale(${1 - index * 0.02})`
+          }}
+          onClick={() => onClickNotification?.(notification.id)}
+        >
+          <div className="flex items-start space-x-3">
+            {getToastIcon(notification.severity)}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 leading-tight">
+                {notification.message}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {new Date(notification.timestamp).toLocaleTimeString('ko-KR')}
+              </p>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose(notification.id);
+              }}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          
+          {/* Progress bar for auto-close */}
+          {notification.autoClose !== false && (
+            <div className="mt-2 h-1 bg-gray-200 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all linear ${
+                  notification.severity === 'critical' ? 'bg-red-400' :
+                  notification.severity === 'warning' ? 'bg-yellow-400' :
+                  notification.severity === 'info' ? 'bg-blue-400' : 'bg-green-400'
+                }`}
+                style={{
+                  animation: `progress ${notification.duration || 5000}ms linear forwards`
+                }}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};

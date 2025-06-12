@@ -2,8 +2,88 @@ import express from 'express';
 import { Database } from 'sqlite';
 import { asyncHandler, CustomError } from '../utils/errorHandler';
 import { Alert, AlertWithSensor } from '../database/models/Alert';
+import { HistoricalDataGenerator } from '../services/HistoricalDataGenerator';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
+let historicalDataGenerator: HistoricalDataGenerator;
+
+// Initialize historical data generator (called from main app)
+export const initializeAnalytics = (db: Database) => {
+  historicalDataGenerator = new HistoricalDataGenerator(db);
+};
+
+// 24시간 시계열 데이터 조회 (과거 12시간 + 미래 12시간)
+router.get('/time-series/:sensorId?', asyncHandler(async (req, res) => {
+  const { sensorId } = req.params;
+  
+  if (!historicalDataGenerator) {
+    const db: Database = req.app.locals.db;
+    historicalDataGenerator = new HistoricalDataGenerator(db);
+  }
+  
+  logger.info(`Generating time series data for sensor: ${sensorId || 'all sensors'}`);
+  
+  const data = await historicalDataGenerator.generateTimeSeriesData(sensorId);
+  
+  res.json({
+    success: true,
+    data,
+    sensor_id: sensorId || 'all',
+    total_points: data.length,
+    time_range: '24 hours (past 12h + future 12h)',
+    generated_at: new Date().toISOString()
+  });
+}));
+
+// 집계 데이터 조회
+router.get('/aggregated/:sensorId', asyncHandler(async (req, res) => {
+  const { sensorId } = req.params;
+  const { 
+    start_time, 
+    end_time, 
+    interval = 'hour' 
+  } = req.query;
+  
+  if (!historicalDataGenerator) {
+    const db: Database = req.app.locals.db;
+    historicalDataGenerator = new HistoricalDataGenerator(db);
+  }
+  
+  if (!start_time || !end_time) {
+    return res.status(400).json({
+      success: false,
+      error: 'start_time과 end_time 파라미터가 필요합니다.'
+    });
+  }
+  
+  const startTime = new Date(start_time as string);
+  const endTime = new Date(end_time as string);
+  
+  if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    return res.status(400).json({
+      success: false,
+      error: '유효한 날짜 형식을 사용해주세요 (ISO 8601).'
+    });
+  }
+  
+  const data = await historicalDataGenerator.generateAggregatedData(
+    sensorId, 
+    startTime, 
+    endTime, 
+    interval as 'hour' | 'day'
+  );
+  
+  res.json({
+    success: true,
+    data,
+    sensor_id: sensorId,
+    start_time: startTime.toISOString(),
+    end_time: endTime.toISOString(),
+    interval,
+    total_points: data.length
+  });
+}));
 
 // GET /api/analytics/summary - Get analytics summary
 router.get('/summary', asyncHandler(async (req, res) => {

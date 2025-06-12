@@ -26,20 +26,33 @@ export const useThreeJS = (): ThreeJSHook => {
 
       // Scene 생성
       const newScene = new THREE.Scene();
-      newScene.background = new THREE.Color(0xf0f8ff);
+      newScene.background = new THREE.Color(0xe8f5e8); // 연한 녹색 배경
 
-      // Camera 생성
-      const newCamera = new THREE.PerspectiveCamera(75, 800 / 600, 0.1, 1000);
+      // 부모 컨테이너 크기 가져오기
+      const parent = canvasRef.current.parentElement;
+      const width = parent?.clientWidth || 800;
+      const height = parent?.clientHeight || 600;
+
+      // Camera 생성 (부모 컨테이너 비율로 설정)
+      const newCamera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
       newCamera.position.set(10, 10, 10);
       newCamera.lookAt(0, 0, 0);
 
-      // Renderer 생성
+      // Renderer 생성 (성능 최적화)
       const newRenderer = new THREE.WebGLRenderer({
         canvas: canvasRef.current,
-        antialias: true
+        antialias: false, // 안티앨리어싱 비활성화로 성능 향상
+        powerPreference: "high-performance" // 고성능 GPU 사용
       });
-      newRenderer.setSize(800, 600);
-      newRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      newRenderer.setSize(width, height);
+      newRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // 픽셀 비율 제한
+      
+      // 그림자 설정 최적화
+      newRenderer.shadowMap.enabled = true;
+      newRenderer.shadowMap.type = THREE.PCFShadowMap; // PCFSoftShadowMap 대신 PCFShadowMap 사용
+      
+      // 색상 관리 최적화
+      newRenderer.outputColorSpace = THREE.SRGBColorSpace;
 
       // 조명 설정
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);

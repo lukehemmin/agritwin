@@ -3,8 +3,7 @@
 @tailwind utilities;
 
 html,
-body,
-#root {
+body {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -14,10 +13,80 @@ body,
   background-color: #f0f2f5; /* A light grey background as a basic default */
 }
 
+#root {
+  height: 100%;
+}
+
+/* Dashboard 페이지에서만 스크롤 방지 */
+.dashboard-layout {
+  height: 100vh;
+  overflow: hidden;
+}
+
 /* Example of a utility class you might have had or want */
 .content-container {
   max-width: 1200px;
   margin-left: auto;
   margin-right: auto;
   padding: 1rem;
+}
+
+/* Toast notification animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* 센서 상태 클래스 */
+.status-normal {
+  @apply bg-green-100 text-green-800;
+}
+
+.status-warning {
+  @apply bg-yellow-100 text-yellow-800;
+}
+
+.status-critical {
+  @apply bg-red-100 text-red-800;
+}
+
+/* 센서 상태 점 */
+.status-dot-normal {
+  @apply w-2 h-2 bg-green-500 rounded-full;
+}
+
+.status-dot-warning {
+  @apply w-2 h-2 bg-yellow-500 rounded-full;
+}
+
+.status-dot-critical {
+  @apply w-2 h-2 bg-red-500 rounded-full;
+}
+
+/* 추가 유틸리티 클래스 */
+.card {
+  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4;
+}
+
+.btn-primary {
+  @apply bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors;
 }

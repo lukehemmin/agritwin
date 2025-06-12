@@ -3,7 +3,15 @@ import { Link } from 'react-router-dom';
 import { Bell, Settings, User } from 'lucide-react';
 import { useWebSocket } from '../../hooks/useWebSocket';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onNotificationClick?: () => void;
+  unreadNotificationCount?: number;
+}
+
+export const Header: React.FC<HeaderProps> = ({ 
+  onNotificationClick,
+  unreadNotificationCount 
+}) => {
   const { isConnected, alerts } = useWebSocket();
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -33,11 +41,15 @@ export const Header: React.FC = () => {
           </div>
 
           {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
+          <button 
+            onClick={onNotificationClick}
+            className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+            title="알림"
+          >
             <Bell size={20} />
-            {alerts.length > 0 && (
+            {(unreadNotificationCount || alerts.length) > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
-                {alerts.length > 99 ? '99+' : alerts.length}
+                {(unreadNotificationCount || alerts.length) > 99 ? '99+' : (unreadNotificationCount || alerts.length)}
               </span>
             )}
           </button>

@@ -13,6 +13,7 @@ interface FarmViewerProps {
   viewMode?: 'plant' | 'zone'; // View mode prop from parent
   onZoneSelect?: (zoneId: string | null) => void;
   onSensorSelect?: (sensorId: string) => void;
+  onChartToggle?: () => void; // Chart modal toggle function
   className?: string;
 }
 
@@ -23,6 +24,7 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
   viewMode = 'plant', // Default to plant view if not provided
   onZoneSelect,
   onSensorSelect,
+  onChartToggle,
   className = ''
 }) => {
   const [cameraUpdateTrigger, setCameraUpdateTrigger] = useState(0);
@@ -111,27 +113,34 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
     };
   }, [handleClick, canvasRef]);
 
-  // Animation loop
+  // Animation loop (프레임 레이트 제한)
   useEffect(() => {
     if (!renderer || !scene || !camera || !controls || isLoading || error) {
       return;
     }
 
     let animationId: number;
+    let lastTime = 0;
+    const targetFPS = 30; // 30 FPS로 제한
+    const frameInterval = 1000 / targetFPS;
 
-    const animate = () => {
-      const controlsChanged = controls.update();
-      
-      // 카메라가 움직였을 때 업데이트 트리거
-      if (controlsChanged) {
-        setCameraUpdateTrigger(prev => prev + 1);
+    const animate = (currentTime: number) => {
+      if (currentTime - lastTime >= frameInterval) {
+        const controlsChanged = controls.update();
+        
+        // 카메라가 움직였을 때 업데이트 트리거
+        if (controlsChanged) {
+          setCameraUpdateTrigger(prev => prev + 1);
+        }
+        
+        renderer.render(scene, camera);
+        lastTime = currentTime;
       }
       
-      renderer.render(scene, camera);
       animationId = requestAnimationFrame(animate);
     };
 
-    animate();
+    animate(0);
 
     return () => {
       if (animationId) {
@@ -143,12 +152,15 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
   // Resize handling is now done in useThreeJS hook
 
   return (
-    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className}`} style={{ minHeight: '400px' }}>
+    <div className={`relative bg-gray-100 rounded-lg overflow-hidden ${className}`} style={{ width: '100%', height: '100%' }}>
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-pointer"
         style={{ 
-          display: 'block'
+          display: 'block',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          objectFit: 'contain'
         }}
       />
       
@@ -233,6 +245,22 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
               📊 실시간 데이터: {sensorData.filter(s => s.status === 'critical' || s.status === 'warning').length}개 주의/위험
             </div>
           </div>
+
+          {/* Chart Toggle Button */}
+          {onChartToggle && (
+            <div className="absolute bottom-4 right-4 z-20">
+              <button
+                onClick={onChartToggle}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center space-x-2"
+                title="실시간 차트 보기"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <span className="text-sm font-medium">실시간 차트</span>
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

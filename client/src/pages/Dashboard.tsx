@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { FarmViewer } from '../components/three/FarmViewer';
 import { SensorPanel } from '../components/dashboard/SensorPanel';
-import { ChartSection } from '../components/dashboard/ChartSection';
-import { AlertPanel } from '../components/dashboard/AlertPanel';
-import { StatCard } from '../components/dashboard/StatCard';
+import { ChartModal } from '../components/charts/ChartModal';
 import { ZoneSelector } from '../components/controls/ZoneSelector';
 import { TimeRange } from '../components/controls/TimeRange';
+import { FarmControlPanel } from '../components/controls/FarmControlPanel';
 import { Loading } from '../components/common/Loading';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { apiService } from '../services/api';
@@ -16,12 +15,12 @@ const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'plant' | 'zone'>('plant'); // 식물별 보기 vs 구역별 보기
+  const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<[Date, Date]>([
     new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
     new Date()
   ]);
   const [farmStructure, setFarmStructure] = useState<FarmStructure | null>(null);
-  const [farmSummary, setFarmSummary] = useState<any>(null);
   const [processedZones, setProcessedZones] = useState<FarmZone[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,10 +51,6 @@ const Dashboard: React.FC = () => {
         }
         setFarmStructure(structure);
         
-        // Load farm summary
-        const summary = await apiService.getFarmSummary();
-        console.log('📈 Dashboard: Farm summary loaded', summary);
-        setFarmSummary(summary);
         
         setError(null);
       } catch (err) {
@@ -228,8 +223,6 @@ const Dashboard: React.FC = () => {
   }
 
   // const zones = farmStructure?.zones || []; // 이제 processedZones를 사용합니다.
-  const overview = farmSummary?.overview;
-  const sensorAverages = farmSummary?.sensor_averages || [];
 
   console.log('📊 Dashboard: All sensor data', {
     total: sensorData.length,
@@ -237,26 +230,11 @@ const Dashboard: React.FC = () => {
     sample: sensorData.slice(0, 3)
   });
 
-  // Calculate averages from recent sensor data
-  const tempSensor = sensorAverages.find((s: any) => s.type === 'temperature');
-  const humiditySensor = sensorAverages.find((s: any) => s.type === 'humidity');
-  
-  // Calculate real-time averages from current data
-  const recentTempData = sensorData.filter(d => d.sensor_id.includes('temperature'));
-  const recentHumidityData = sensorData.filter(d => d.sensor_id.includes('humidity'));
-  
-  const currentTempAvg = recentTempData.length > 0 
-    ? recentTempData.reduce((sum, d) => sum + d.value, 0) / recentTempData.length 
-    : tempSensor?.avg_value || 0;
-    
-  const currentHumidityAvg = recentHumidityData.length > 0 
-    ? recentHumidityData.reduce((sum, d) => sum + d.value, 0) / recentHumidityData.length 
-    : humiditySensor?.avg_value || 0;
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="dashboard-layout h-screen flex flex-col bg-gray-50">
       {/* Top Controls */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-3">
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-3 max-h-none">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl font-bold text-gray-900">농장 대시보드</h1>
@@ -274,48 +252,17 @@ const Dashboard: React.FC = () => {
               value={timeRange}
               onChange={setTimeRange}
             />
+            
             <button className="btn-primary">
               데이터 내보내기
             </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-          <StatCard
-            title="총 센서"
-            value={overview?.total_sensors || 0}
-            unit="개"
-            trend={{ value: 0, isPositive: true }}
-            icon="sensors"
-          />
-          <StatCard
-            title="활성 센서"
-            value={sensorData.length}
-            unit="개"
-            trend={{ value: 2, isPositive: true }}
-            icon="active"
-            status={sensorData.length > 0 ? "success" : "warning"}
-          />
-          <StatCard
-            title="평균 온도"
-            value={Math.round(currentTempAvg * 10) / 10}
-            unit="°C"
-            trend={{ value: 1.2, isPositive: true }}
-            icon="temperature"
-          />
-          <StatCard
-            title="평균 습도"
-            value={Math.round(currentHumidityAvg * 10) / 10}
-            unit="%"
-            trend={{ value: -2.1, isPositive: false }}
-            icon="humidity"
-          />
-        </div>
 
         {/* Real-time data info */}
         {sensorData.length > 0 && (
-          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs flex-shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-blue-700">
                 📊 실시간: {sensorData.length}개 센서
@@ -331,7 +278,7 @@ const Dashboard: React.FC = () => {
 
         {/* Alerts info */}
         {alerts.length > 0 && (
-          <div className="mt-1 p-2 bg-orange-50 border border-orange-200 rounded text-xs">
+          <div className="mt-1 p-2 bg-orange-50 border border-orange-200 rounded text-xs flex-shrink-0">
             <div className="flex items-center justify-between">
               <span className="text-orange-700">
                 🚨 알림: {alerts.length}개
@@ -347,11 +294,11 @@ const Dashboard: React.FC = () => {
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Panel - 3D Viewer */}
-        <div className="flex-1 flex flex-col bg-white border-r border-gray-200 min-w-0">
-          <div className="flex-shrink-0 p-3 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-900">3D 농장 뷰</h2>
-              <div className="flex items-center space-x-4">
+        <div className="flex-1 flex flex-col bg-white border-r border-gray-200 min-w-0 min-h-0">
+          <div className="flex-shrink-0 p-3 border-b border-gray-200 h-auto max-h-none">
+            <div className="flex items-center justify-between min-h-0">
+              <h2 className="text-base font-semibold text-gray-900 flex-shrink-0">3D 농장 뷰</h2>
+              <div className="flex items-center space-x-4 flex-shrink-0">
                 {/* View Mode Toggle */}
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600 font-medium">보기 모드:</span>
@@ -396,7 +343,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex-1 relative overflow-hidden">
+          <div className="flex-1 relative overflow-hidden min-h-0">
             <FarmViewer 
               zones={processedZones} // farmStructure.zones 대신 processedZones 사용
               sensorData={sensorData}
@@ -407,42 +354,47 @@ const Dashboard: React.FC = () => {
                 console.log('Sensor selected:', sensorId);
                 // Handle sensor selection (could open a modal or navigate to sensor detail)
               }}
-              className="absolute inset-0"
+              onChartToggle={() => setIsChartModalOpen(!isChartModalOpen)}
+              className="w-full h-full"
             />
           </div>
         </div>
 
-        {/* Right Panel - Data Panels */}
+        {/* Right Panel - Sensor Panel + Control Panel */}
         <div className="w-80 xl:w-96 flex flex-col bg-gray-50 overflow-hidden flex-shrink-0">
-          <div className="flex-1 overflow-auto">
-            {/* Sensor Panel */}
-            <div className="p-4">
-              <SensorPanel 
-                selectedZone={selectedZone}
-                sensorData={sensorData}
-                isConnected={isConnected}
-              />
-            </div>
-
-            {/* Charts */}
-            <div className="p-4">
-              <ChartSection 
-                selectedZone={selectedZone}
-                timeRange={timeRange}
-                sensorData={sensorData}
-              />
-            </div>
-
-            {/* Alerts */}
-            <div className="p-4">
-              <AlertPanel 
-                alerts={alerts}
-                isConnected={isConnected}
-              />
-            </div>
+          {/* Sensor Panel - 더 많은 공간 할당 */}
+          <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: '60vh' }}>
+            <SensorPanel 
+              selectedZone={selectedZone}
+              sensorData={sensorData}
+              isConnected={isConnected}
+            />
+          </div>
+          
+          {/* Control Panel - 컴팩트하게 표시 */}
+          <div className="flex-shrink-0 p-3 border-t border-gray-200">
+            <FarmControlPanel
+              onLightingControl={(tier, side, action) => {
+                console.log(`조명 제어: ${tier}층 ${side}구역 ${action}`);
+                // TODO: 3D 모델의 LED 조명 제어 구현
+              }}
+              onIrrigationControl={(tier, side, action) => {
+                console.log(`급수 제어: ${tier}층 ${side}구역 ${action}`);
+                // TODO: 3D 모델의 스프링클러 제어 구현
+              }}
+            />
           </div>
         </div>
       </div>
+
+      {/* Chart Modal */}
+      <ChartModal
+        isOpen={isChartModalOpen}
+        onClose={() => setIsChartModalOpen(false)}
+        selectedZone={selectedZone}
+        timeRange={timeRange}
+        sensorData={sensorData}
+      />
     </div>
   );
 };

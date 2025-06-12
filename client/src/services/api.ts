@@ -291,6 +291,59 @@ export class ApiService {
     });
     return response.data.data;
   }
+
+  // 24시간 시계열 데이터 조회 (과거 12시간 + 미래 12시간)
+  async getTimeSeriesData(sensorId?: string): Promise<{
+    data: Array<{
+      timestamp: string;
+      value: number;
+      unit: string;
+      status: 'normal' | 'warning' | 'critical';
+      sensor_id: string;
+      sensor_name: string;
+      sensor_type: string;
+    }>;
+    sensor_id: string;
+    total_points: number;
+    time_range: string;
+    generated_at: string;
+  }> {
+    const endpoint = sensorId ? `/analytics/time-series/${sensorId}` : '/analytics/time-series';
+    const response = await this.api.get<any>(endpoint);
+    return response.data;
+  }
+
+  // 집계 데이터 조회
+  async getAggregatedData(
+    sensorId: string,
+    startTime: string,
+    endTime: string,
+    interval: 'hour' | 'day' = 'hour'
+  ): Promise<{
+    data: Array<{
+      timestamp: string;
+      average: number;
+      min: number;
+      max: number;
+      sensor_id: string;
+      sensor_name: string;
+      unit: string;
+    }>;
+    sensor_id: string;
+    start_time: string;
+    end_time: string;
+    interval: string;
+    total_points: number;
+  }> {
+    const response = await this.api.get<any>(`/analytics/aggregated/${sensorId}`, {
+      params: {
+        start_time: startTime,
+        end_time: endTime,
+        interval,
+      },
+    });
+    return response.data;
+  }
 }
 
 // Singleton instance

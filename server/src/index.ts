@@ -14,7 +14,7 @@ import { errorHandler } from './utils/errorHandler';
 // Routes
 import sensorsRouter from './routes/sensors';
 import farmRouter from './routes/farm';
-import analyticsRouter from './routes/analytics';
+import analyticsRouter, { initializeAnalytics } from './routes/analytics';
 import plantsRouter from './routes/plants';
 
 // WebSocket handlers
@@ -61,6 +61,9 @@ async function startServer() {
     // Make database available to routes
     app.locals.db = db;
     app.locals.io = io;
+
+    // Initialize analytics service
+    initializeAnalytics(db);
 
     // Routes
     app.use('/api/sensors', sensorsRouter);

@@ -5,16 +5,20 @@ import {
   Database,
   Download,
   PieChart,
-  Activity
+  Activity,
+  TrendingUp
 } from 'lucide-react';
 import { apiService, AnalyticsSummary, Alert } from '../services/api';
 import { Loading } from '../components/common/Loading';
+import { MultiSensorChart } from '../components/charts/MultiSensorChart';
+import { MetricsSummary } from '../components/analytics/MetricsSummary';
 
 const Analytics: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'1h' | '6h' | '24h' | '7d'>('24h');
+  const [timeSeriesData, setTimeSeriesData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAnalytics = async () => {
@@ -30,12 +34,15 @@ const Analytics: React.FC = () => {
       const alertsData = await apiService.getAlerts({ limit: 10 });
       setAlerts(alertsData.alerts);
 
-      // Fetch trends data
-      // const trendsData = await apiService.getTrends({ 
-      //   period: selectedPeriod,
-      //   interval: selectedPeriod === '24h' ? 'hourly' : 'minute'
-      // });
-      // setTrends(trendsData); // trends state removed
+      // Fetch 24시간 시계열 데이터 (과거 12시간 + 미래 12시간)
+      try {
+        const timeSeriesResponse = await apiService.getTimeSeriesData();
+        setTimeSeriesData(timeSeriesResponse);
+        console.log('Time series data loaded:', timeSeriesResponse);
+      } catch (timeSeriesError) {
+        console.error('Failed to fetch time series data:', timeSeriesError);
+        // 시계열 데이터 로딩 실패해도 전체 페이지는 로드되도록 함
+      }
 
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
@@ -105,7 +112,7 @@ const Analytics: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen overflow-y-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -195,6 +202,116 @@ const Analytics: React.FC = () => {
             <p className="text-xs text-gray-500 mt-2">
               정상 상태 센서 비율
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* 핵심 지표 대시보드 */}
+      {timeSeriesData && timeSeriesData.data && timeSeriesData.data.length > 0 && (
+        <MetricsSummary 
+          data={{
+            avgTemperature: {
+              current: 22.5,
+              previous: 21.8,
+              unit: '°C',
+              trend: 'up',
+              changePercent: 3.2
+            },
+            avgHumidity: {
+              current: 68.3,
+              previous: 71.2,
+              unit: '%',
+              trend: 'down',
+              changePercent: -4.1
+            },
+            avgSoilMoisture: {
+              current: 75.8,
+              previous: 73.5,
+              unit: '%',
+              trend: 'up',
+              changePercent: 3.1
+            },
+            avgLight: {
+              current: 18500,
+              previous: 17200,
+              unit: 'lux',
+              trend: 'up',
+              changePercent: 7.6
+            },
+            growthRate: {
+              current: 95.4,
+              previous: 92.1,
+              unit: '%',
+              trend: 'up',
+              changePercent: 3.6
+            },
+            systemHealth: {
+              current: 98.2,
+              previous: 96.8,
+              unit: '%',
+              trend: 'up',
+              changePercent: 1.4
+            }
+          }}
+        />
+      )}
+
+      {/* 다중 센서 차트 */}
+      {timeSeriesData && timeSeriesData.data && timeSeriesData.data.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-3">
+            <TrendingUp className="text-blue-500" size={24} />
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">센서 데이터 추이</h2>
+              <p className="text-sm text-gray-600">과거 12시간 실제 데이터 + 미래 12시간 예측 데이터</p>
+            </div>
+          </div>
+          
+          {/* 다중 센서 차트 그리드 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 환경 센서 (온도, 습도) */}
+            <MultiSensorChart 
+              data={timeSeriesData.data.filter((d: any) => 
+                ['temperature', 'humidity'].includes(d.sensor_type)
+              )}
+              title="환경 센서 (온도 & 습도)"
+              height={280}
+            />
+            
+            {/* 토양 & 조도 센서 */}
+            <MultiSensorChart 
+              data={timeSeriesData.data.filter((d: any) => 
+                ['soil_moisture', 'light'].includes(d.sensor_type)
+              )}
+              title="토양수분 & 조도 센서"
+              height={280}
+            />
+            
+            {/* CO2 센서 (별도) */}
+            <div className="lg:col-span-2">
+              <MultiSensorChart 
+                data={timeSeriesData.data.filter((d: any) => d.sensor_type === 'co2')}
+                title="CO2 센서"
+                height={250}
+              />
+            </div>
+          </div>
+          
+          {/* 데이터 정보 */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center space-x-4">
+                <span className="text-blue-700">
+                  📊 총 데이터 포인트: <strong>{timeSeriesData.total_points}개</strong>
+                </span>
+                <span className="text-blue-700">
+                  🕒 데이터 범위: <strong>{timeSeriesData.time_range}</strong>
+                </span>
+              </div>
+              <span className="text-blue-600">
+                생성 시간: {new Date(timeSeriesData.generated_at).toLocaleString()}
+              </span>
+            </div>
           </div>
         </div>
       )}
