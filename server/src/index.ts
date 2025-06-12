@@ -15,9 +15,13 @@ import { errorHandler } from './utils/errorHandler';
 import sensorsRouter from './routes/sensors';
 import farmRouter from './routes/farm';
 import analyticsRouter from './routes/analytics';
+import plantsRouter from './routes/plants';
 
 // WebSocket handlers
 import { setupSocketHandlers } from './websocket/socketHandlers';
+
+// Services
+import { PlantGrowthSimulator } from './services/PlantGrowthSimulator';
 
 // Load environment variables
 dotenv.config();
@@ -62,6 +66,7 @@ async function startServer() {
     app.use('/api/sensors', sensorsRouter);
     app.use('/api/farm', farmRouter);
     app.use('/api/analytics', analyticsRouter);
+    app.use('/api/plants', plantsRouter);
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {
@@ -75,6 +80,10 @@ async function startServer() {
 
     // Setup WebSocket handlers
     setupSocketHandlers(io, db);
+
+    // Start plant growth simulation
+    const plantSimulator = PlantGrowthSimulator.getInstance();
+    plantSimulator.start();
 
     // Error handling middleware
     app.use(errorHandler);

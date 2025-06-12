@@ -1,7 +1,496 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { FarmZone } from '../../types/farm.types';
 import { Sensor } from '../../types/sensor.types';
+
+// ZoneInfoModal Component (defined in the same file to avoid import issues)
+interface ZoneInfoModalProps {
+  zoneData: FarmZone | null;
+  onClose: () => void;
+}
+
+// PlantSensorModal Component
+interface PlantSensorModalProps {
+  plantData: PlantSensorButtonProps | null;
+  onClose: () => void;
+}
+
+const ZoneInfoModal: React.FC<ZoneInfoModalProps> = ({ zoneData, onClose }) => {
+  if (!zoneData) return null;
+
+  // 구역 건강 상태 계산
+  const getZoneHealthStatus = () => {
+    if (!zoneData.sensors || zoneData.sensors.length === 0) return { status: 'unknown', color: '#6b7280', icon: '🏭' };
+    
+    const criticalCount = zoneData.sensors.filter(s => s.latest_status === 'critical').length;
+    const warningCount = zoneData.sensors.filter(s => s.latest_status === 'warning').length;
+    
+    if (criticalCount > 0) return { status: 'critical', color: '#ef4444', icon: '🚨' };
+    if (warningCount > 0) return { status: 'warning', color: '#f59e0b', icon: '⚠️' };
+    return { status: 'normal', color: '#10b981', icon: '🏢' };
+  };
+
+  const zoneHealth = getZoneHealthStatus();
+
+  // 센서 타입별 그룹화
+  const sensorsByType = zoneData.sensors ? zoneData.sensors.reduce((acc: any, sensor) => {
+    if (!acc[sensor.type]) acc[sensor.type] = [];
+    acc[sensor.type].push(sensor);
+    return acc;
+  }, {}) : {};
+
+  // 센서 타입별 평균값 계산
+  const getSensorSummary = (sensors: Sensor[]) => {
+    const validSensors = sensors.filter(s => s.latest_value !== null && s.latest_value !== undefined);
+    if (validSensors.length === 0) return { avg: 0, min: 0, max: 0, unit: '' };
+    
+    const values = validSensors.map(s => s.latest_value!);
+    return {
+      avg: Math.round((values.reduce((sum, val) => sum + val, 0) / values.length) * 10) / 10,
+      min: Math.min(...values),
+      max: Math.max(...values),
+      unit: validSensors[0].unit || ''
+    };
+  };
+
+  const getSensorIcon = (type: string) => {
+    switch (type) {
+      case 'temperature': return '🌡️';
+      case 'humidity': return '💧';
+      case 'soil_moisture': return '🌱';
+      case 'light': return '💡';
+      case 'co2': return '🌬️';
+      default: return '📊';
+    }
+  };
+
+  const getSensorTypeName = (type: string) => {
+    switch (type) {
+      case 'temperature': return '온도';
+      case 'humidity': return '습도';
+      case 'soil_moisture': return '토양 수분';
+      case 'light': return '조도';
+      case 'co2': return 'CO2';
+      default: return type;
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1001,
+      backdropFilter: 'blur(4px)'
+    }}>
+      <div style={{
+        backgroundColor: 'white', borderRadius: '16px',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        width: '90%', maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif'
+      }}>
+        {/* 헤더 */}
+        <div style={{
+          background: `linear-gradient(135deg, ${zoneHealth.color}22, ${zoneHealth.color}11)`,
+          padding: '24px', borderRadius: '16px 16px 0 0',
+          borderBottom: '1px solid #f3f4f6'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                fontSize: '32px', background: 'white', borderRadius: '12px',
+                padding: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+              }}>
+                {zoneHealth.icon}
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '24px', fontWeight: '700', color: '#1f2937' }}>
+                  {zoneData.name || zoneData.id}
+                </h2>
+                <p style={{ margin: '4px 0 0 0', color: '#6b7280', fontSize: '14px' }}>
+                  구역 상태: <span style={{ color: zoneHealth.color, fontWeight: '600' }}>
+                    {zoneHealth.status === 'normal' ? '정상' : 
+                     zoneHealth.status === 'warning' ? '주의' : 
+                     zoneHealth.status === 'critical' ? '위험' : '알 수 없음'}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <button onClick={onClose} style={{
+              background: 'white', border: 'none', borderRadius: '8px',
+              width: '32px', height: '32px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '18px', color: '#6b7280',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#f9fafb';
+              e.currentTarget.style.color = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'white';
+              e.currentTarget.style.color = '#6b7280';
+            }}>
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* 컨텐츠 */}
+        <div style={{ padding: '24px' }}>
+          {/* 구역 정보 */}
+          <div style={{
+            background: '#f9fafb', borderRadius: '12px', padding: '16px',
+            marginBottom: '20px', border: '1px solid #e5e7eb'
+          }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', fontWeight: '600', color: '#374151' }}>
+              📍 구역 정보
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '14px' }}>
+              <div>
+                <span style={{ color: '#6b7280' }}>구역 ID:</span>
+                <div style={{ fontWeight: '600', color: '#1f2937' }}>{zoneData.id}</div>
+              </div>
+              <div>
+                <span style={{ color: '#6b7280' }}>센서 개수:</span>
+                <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                  {zoneData.sensors ? zoneData.sensors.length : 0}개
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 센서 현황 */}
+          <div style={{ marginBottom: '20px' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '600', color: '#374151' }}>
+              📊 센서 현황
+            </h3>
+            
+            {Object.keys(sensorsByType).length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {Object.entries(sensorsByType).map(([type, sensors]) => {
+                  const summary = getSensorSummary(sensors as Sensor[]);
+                  const icon = getSensorIcon(type);
+                  const name = getSensorTypeName(type);
+                  
+                  return (
+                    <div key={type} style={{
+                      background: 'white', borderRadius: '12px', padding: '16px',
+                      border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '20px' }}>{icon}</span>
+                          <span style={{ fontWeight: '600', color: '#374151' }}>{name}</span>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '18px', fontWeight: '700', color: '#1f2937' }}>
+                            {summary.avg}{summary.unit}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#6b7280' }}>
+                            {summary.min} ~ {summary.max}{summary.unit}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center', padding: '40px', color: '#6b7280',
+                background: '#f9fafb', borderRadius: '12px', border: '2px dashed #d1d5db'
+              }}>
+                <div style={{ fontSize: '48px', marginBottom: '12px' }}>📊</div>
+                <p style={{ margin: 0, fontSize: '16px' }}>이 구역에는 센서 정보가 없습니다</p>
+              </div>
+            )}
+          </div>
+
+          {/* 실시간 차트 플레이스홀더 */}
+          <div style={{
+            background: 'linear-gradient(135deg, #667eea22, #764ba222)',
+            borderRadius: '12px', padding: '24px', textAlign: 'center',
+            border: '2px dashed #a855f7'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📈</div>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: '600', color: '#374151' }}>
+              실시간 차트
+            </h4>
+            <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>
+              구역별 환경 데이터의 시간별 변화를 표시합니다
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PlantSensorModal: React.FC<PlantSensorModalProps> = ({ plantData, onClose }) => {
+  if (!plantData) return null;
+
+  // 모의 센서 데이터 (실제로는 API에서 가져와야 함)
+  const generateRealisticSensorData = () => {
+    // 구역별 기준 온도 설정 (층과 위치에 따라)
+    const zoneBaseTempMap: Record<string, number> = {
+      'zone-1-1': 22, // 1층 존 1
+      'zone-1-2': 22.5, // 1층 존 2 (약간 따뜻)
+      'zone-2-1': 21.5, // 2층 존 1 (약간 차가움)
+      'zone-2-2': 22, // 2층 존 2
+      'zone-3-1': 21, // 3층 존 1 (가장 차가움)
+      'zone-3-2': 21.5, // 3층 존 2
+    };
+    
+    // 식물 위치에 따른 미세한 변화 (동일 구역 내 식물들은 매우 비슷한 환경)
+    const positionVariation = {
+      temperature: (Math.random() - 0.5) * 1, // ±0.5도
+      humidity: (Math.random() - 0.5) * 5, // ±2.5%
+      soilMoisture: (Math.random() - 0.5) * 8, // ±4%
+      phLevel: (Math.random() - 0.5) * 0.2, // ±0.1
+      lightIntensity: (Math.random() - 0.5) * 6, // ±3%
+      nutrientLevel: (Math.random() - 0.5) * 10 // ±5%
+    };
+    
+    // 구역별 기준값
+    const zoneBaseTemp = zoneBaseTempMap[plantData.zoneId] || 22;
+    
+    const baseValues = {
+      temperature: zoneBaseTemp + positionVariation.temperature,
+      humidity: 68 + positionVariation.humidity, // 구역별로 큰 차이 없음
+      soilMoisture: 65 + positionVariation.soilMoisture,
+      phLevel: 6.4 + positionVariation.phLevel,
+      lightIntensity: 85 + positionVariation.lightIntensity,
+      nutrientLevel: 78 + positionVariation.nutrientLevel
+    };
+    
+    // 건강 상태에 따라 센서 값 조정 (더 현실적으로)
+    if (plantData.healthStatus === 'stressed') {
+      baseValues.temperature += 1.5; // 약간의 스트레스
+      baseValues.soilMoisture -= 8;
+      baseValues.nutrientLevel -= 5;
+    } else if (plantData.healthStatus === 'sick') {
+      baseValues.temperature += 2.5; // 더 심한 스트레스
+      baseValues.soilMoisture -= 15;
+      baseValues.nutrientLevel -= 15;
+      baseValues.phLevel += 0.3; // pH 불균형
+    }
+    
+    return baseValues;
+  };
+
+  const sensorData = generateRealisticSensorData();
+
+  const getSensorStatus = (value: number, optimal: [number, number]) => {
+    if (value < optimal[0] || value > optimal[1]) {
+      return { status: 'warning', color: '#f59e0b' };
+    }
+    return { status: 'normal', color: '#10b981' };
+  };
+
+  const getPlantTypeKorean = (type: string) => {
+    const names: Record<string, string> = {
+      lettuce: '상추',
+      spinach: '시금치',
+      kale: '케일',
+      arugula: '루꼴라',
+      basil: '바질',
+      mint: '민트'
+    };
+    return names[type] || type;
+  };
+
+  const getGrowthStageKorean = (stage: string) => {
+    const stages: Record<string, string> = {
+      seed: '씨앗',
+      sprout: '새싹',
+      growing: '성장',
+      mature: '성숙',
+      harvest: '수확',
+      dead: '죽음'
+    };
+    return stages[stage] || stage;
+  };
+
+  const getHealthStatusKorean = (status: string) => {
+    const statuses: Record<string, string> = {
+      healthy: '건강',
+      stressed: '스트레스',
+      sick: '아픔',
+      dead: '죽음'
+    };
+    return statuses[status] || status;
+  };
+
+  const modalStyles: { [key: string]: React.CSSProperties } = {
+    overlay: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1001,
+    },
+    modal: {
+      backgroundColor: 'white', padding: '20px', borderRadius: '12px',
+      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)', width: '90%',
+      maxWidth: '500px', maxHeight: '80vh', overflowY: 'auto',
+    },
+    header: {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      borderBottom: '2px solid #e5e7eb', paddingBottom: '15px', marginBottom: '20px',
+    },
+    closeButton: { 
+      background: 'none', border: 'none', fontSize: '1.5rem', 
+      cursor: 'pointer', color: '#6b7280', padding: '5px'
+    },
+    sensorGrid: {
+      display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '15px', marginTop: '20px'
+    },
+    sensorCard: {
+      border: '1px solid #e5e7eb', borderRadius: '8px',
+      padding: '12px', backgroundColor: '#f9fafb'
+    },
+    sensorLabel: {
+      fontSize: '0.875rem', fontWeight: '600',
+      color: '#374151', marginBottom: '5px'
+    },
+    sensorValue: {
+      fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '2px'
+    },
+    sensorUnit: {
+      fontSize: '0.75rem', color: '#6b7280'
+    }
+  };
+
+  return (
+    <div style={modalStyles.overlay}>
+      <div style={modalStyles.modal}>
+        <div style={modalStyles.header}>
+          <div>
+            <h2 style={{ margin: 0, color: '#1f2937' }}>🌱 식물 센서 정보</h2>
+            <p style={{ margin: '5px 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+              {getPlantTypeKorean(plantData.plantType)} • {plantData.zoneId} • 위치: ({plantData.position.row + 1}, {plantData.position.col + 1})
+            </p>
+          </div>
+          <button onClick={onClose} style={modalStyles.closeButton}>×</button>
+        </div>
+        
+        <div>
+          <div style={{ marginBottom: '20px' }}>
+            <h3 style={{ margin: '0 0 10px 0', color: '#1f2937' }}>식물 상태</h3>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <div>
+                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>성장 단계:</span>
+                <span style={{ marginLeft: '8px', fontWeight: '600', color: '#059669' }}>
+                  {getGrowthStageKorean(plantData.growthStage)}
+                </span>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>건강 상태:</span>
+                <span style={{ 
+                  marginLeft: '8px', fontWeight: '600',
+                  color: plantData.healthStatus === 'healthy' ? '#059669' : 
+                         plantData.healthStatus === 'stressed' ? '#d97706' : '#dc2626'
+                }}>
+                  {getHealthStatusKorean(plantData.healthStatus)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <h3 style={{ margin: '0 0 15px 0', color: '#1f2937' }}>토양 센서 데이터</h3>
+          <div style={modalStyles.sensorGrid}>
+            <div style={modalStyles.sensorCard}>
+              <div style={modalStyles.sensorLabel}>🌡️ 온도</div>
+              <div style={{ 
+                ...modalStyles.sensorValue, 
+                color: getSensorStatus(sensorData.temperature, [18, 24]).color 
+              }}>
+                {sensorData.temperature.toFixed(1)}
+              </div>
+              <div style={modalStyles.sensorUnit}>°C</div>
+            </div>
+            
+            <div style={modalStyles.sensorCard}>
+              <div style={modalStyles.sensorLabel}>💧 습도</div>
+              <div style={{ 
+                ...modalStyles.sensorValue, 
+                color: getSensorStatus(sensorData.humidity, [60, 80]).color 
+              }}>
+                {sensorData.humidity.toFixed(0)}
+              </div>
+              <div style={modalStyles.sensorUnit}>%</div>
+            </div>
+            
+            <div style={modalStyles.sensorCard}>
+              <div style={modalStyles.sensorLabel}>🏔️ 토양수분</div>
+              <div style={{ 
+                ...modalStyles.sensorValue, 
+                color: getSensorStatus(sensorData.soilMoisture, [40, 80]).color 
+              }}>
+                {sensorData.soilMoisture.toFixed(0)}
+              </div>
+              <div style={modalStyles.sensorUnit}>%</div>
+            </div>
+            
+            <div style={modalStyles.sensorCard}>
+              <div style={modalStyles.sensorLabel}>🧪 pH</div>
+              <div style={{ 
+                ...modalStyles.sensorValue, 
+                color: getSensorStatus(sensorData.phLevel, [6.0, 7.0]).color 
+              }}>
+                {sensorData.phLevel.toFixed(1)}
+              </div>
+              <div style={modalStyles.sensorUnit}>pH</div>
+            </div>
+            
+            <div style={modalStyles.sensorCard}>
+              <div style={modalStyles.sensorLabel}>☀️ 조도</div>
+              <div style={{ 
+                ...modalStyles.sensorValue, 
+                color: getSensorStatus(sensorData.lightIntensity, [60, 100]).color 
+              }}>
+                {sensorData.lightIntensity.toFixed(0)}
+              </div>
+              <div style={modalStyles.sensorUnit}>%</div>
+            </div>
+            
+            <div style={modalStyles.sensorCard}>
+              <div style={modalStyles.sensorLabel}>🌿 영양분</div>
+              <div style={{ 
+                ...modalStyles.sensorValue, 
+                color: getSensorStatus(sensorData.nutrientLevel, [70, 100]).color 
+              }}>
+                {sensorData.nutrientLevel.toFixed(0)}
+              </div>
+              <div style={modalStyles.sensorUnit}>%</div>
+            </div>
+          </div>
+          
+          <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
+            <h4 style={{ margin: '0 0 10px 0', color: '#374151' }}>💡 권장사항</h4>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: '#6b7280', fontSize: '0.875rem' }}>
+              {sensorData.soilMoisture < 40 && (
+                <li>토양 수분이 부족합니다. 물을 주세요.</li>
+              )}
+              {sensorData.temperature > 24 && (
+                <li>온도가 높습니다. 환기를 늘려주세요.</li>
+              )}
+              {sensorData.nutrientLevel < 70 && (
+                <li>영양분이 부족합니다. 비료를 공급해주세요.</li>
+              )}
+              {sensorData.phLevel < 6.0 && (
+                <li>토양이 산성입니다. pH 조절이 필요합니다.</li>
+              )}
+              {sensorData.phLevel > 7.0 && (
+                <li>토양이 알칼리성입니다. pH 조절이 필요합니다.</li>
+              )}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Helper function to create a zone mesh
 function createZoneMesh(id: string, sizeX: number, sizeY: number, sizeZ: number, posX: number, posY: number, posZ: number, currentSelectedZoneId: string | null) {
@@ -30,8 +519,34 @@ interface FarmModelProps {
   scene: THREE.Scene;
   zones: FarmZone[];
   selectedZoneId: string | null;
-  onZoneClick?: (zoneId: string | null) => void; 
+  camera: THREE.Camera; // 카메라 prop 추가
+  cameraUpdateTrigger?: number; // 카메라 업데이트 트리거
+  viewMode?: 'plant' | 'zone'; // 보기 모드
+  onZoneClick?: (zoneId: string | null) => void;
   onSensorClick?: (sensorId: string) => void;
+}
+
+// ... 기존 상수들 ...
+
+interface ZoneButtonProps {
+  id: string;
+  name: string; // 구역 이름 (예: "floor-1-A")
+  x: number;    // 화면 X 좌표
+  y: number;    // 화면 Y 좌표
+  visible: boolean; // 화면에 보이는지 여부
+  zoneData: FarmZone; // 해당 구역의 전체 데이터 (센서 정보 포함)
+}
+
+interface PlantSensorButtonProps {
+  id: string;
+  plantType: string;
+  growthStage: string;
+  healthStatus: string;
+  x: number;
+  y: number;
+  visible: boolean;
+  position: { row: number; col: number };
+  zoneId: string;
 }
 
 const DEFAULT_ZONE_COLOR = 0x007bff; // Blue - Can be changed to a more earthy tone
@@ -92,25 +607,357 @@ const SUPPORT_COLUMN_RADIUS = 0.03;
 const SUPPORT_COLUMN_COLOR = 0x888888; // Grey, similar to frame
 const SUPPORT_COLUMN_SEGMENTS = 12;
 
+// Plant Constants
+const PLANT_COLORS = {
+  lettuce: { leaf: 0x32CD32, stem: 0x228B22, dark: 0x228B22 },  // 상추
+  spinach: { leaf: 0x228B22, stem: 0x1F5F1F, dark: 0x0F3F0F },  // 시금치
+  kale: { leaf: 0x006400, stem: 0x004100, dark: 0x002100 },     // 케일
+  arugula: { leaf: 0x9ACD32, stem: 0x6B8B23, dark: 0x556B2F },  // 루꼴라
+  basil: { leaf: 0x8FBC8F, stem: 0x6B8B23, dark: 0x2E4B28 },    // 바질
+  mint: { leaf: 0x90EE90, stem: 0x6B8B23, dark: 0x32CD32 }      // 민트
+};
+
+const PLANT_BASE_HEIGHT = 0.08;
+const PLANTS_PER_ROW = 6;
+const PLANTS_PER_COLUMN = 6;
+
+// Plant creation helper function
+function createRealisticPlant(
+  plantType: keyof typeof PLANT_COLORS, 
+  growthStage: 'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead' = 'mature',
+  healthStatus: 'healthy' | 'stressed' | 'sick' | 'dead' = 'healthy',
+  sizeMultiplier: number = 1.0
+): THREE.Group {
+  const plantGroup = new THREE.Group();
+  const colors = PLANT_COLORS[plantType];
+  
+  // 성장 단계별 크기 조정
+  const stageMultipliers = {
+    seed: 0.1,
+    sprout: 0.3,
+    growing: 0.7,
+    mature: 1.0,
+    harvest: 1.2,
+    dead: 0.8
+  };
+  
+  const finalSize = stageMultipliers[growthStage] * sizeMultiplier;
+  
+  // 건강 상태별 색상 조정
+  let healthColorModifier = { r: 1, g: 1, b: 1 };
+  switch (healthStatus) {
+    case 'stressed':
+      healthColorModifier = { r: 1, g: 0.9, b: 0.7 }; // 약간 노랗게
+      break;
+    case 'sick':
+      healthColorModifier = { r: 1, g: 0.7, b: 0.5 }; // 갈색으로
+      break;
+    case 'dead':
+      healthColorModifier = { r: 0.4, g: 0.3, b: 0.2 }; // 갈색/검은색으로
+      break;
+  }
+  
+  // 건강 상태를 반영한 재료
+  const applyHealthColor = (originalColor: number) => {
+    const color = new THREE.Color(originalColor);
+    color.r *= healthColorModifier.r;
+    color.g *= healthColorModifier.g;
+    color.b *= healthColorModifier.b;
+    return color.getHex();
+  };
+  
+  // Stem material
+  const stemMaterial = new THREE.MeshStandardMaterial({
+    color: applyHealthColor(colors.stem),
+    roughness: 0.8,
+    metalness: 0.1,
+  });
+  
+  // Leaf materials
+  const leafMaterial = new THREE.MeshStandardMaterial({
+    color: applyHealthColor(colors.leaf),
+    roughness: 0.9,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+  });
+  
+  const darkLeafMaterial = new THREE.MeshStandardMaterial({
+    color: applyHealthColor(colors.dark),
+    roughness: 0.9,
+    metalness: 0.0,
+    side: THREE.DoubleSide,
+  });
+  
+  // 성장 단계별 줄기 생성
+  if (growthStage !== 'seed') {
+    const stemHeight = PLANT_BASE_HEIGHT * 0.6 * finalSize;
+    const stemGeometry = new THREE.CylinderGeometry(0.005 * finalSize, 0.008 * finalSize, stemHeight, 6);
+    const stem = new THREE.Mesh(stemGeometry, stemMaterial);
+    stem.position.y = stemHeight * 0.5;
+    plantGroup.add(stem);
+  }
+  
+  // 성장 단계별 처리
+  if (growthStage === 'seed') {
+    // 씨앗 단계 - 작은 갈색 구
+    const seedGeometry = new THREE.SphereGeometry(0.008 * finalSize, 6, 4);
+    const seedMaterial = new THREE.MeshStandardMaterial({
+      color: 0x8B4513, // 갈색
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+    const seed = new THREE.Mesh(seedGeometry, seedMaterial);
+    seed.position.y = 0.005;
+    plantGroup.add(seed);
+    return plantGroup;
+  }
+  
+  if (growthStage === 'sprout') {
+    // 새싹 단계 - 작은 줄기와 초기 잎 1-2개
+    const leafCount = 2;
+    for (let i = 0; i < leafCount; i++) {
+      const leafGeometry = new THREE.SphereGeometry(0.01 * finalSize, 6, 4);
+      const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+      const angle = (i / leafCount) * Math.PI * 2;
+      leaf.position.x = Math.cos(angle) * 0.008;
+      leaf.position.z = Math.sin(angle) * 0.008;
+      leaf.position.y = PLANT_BASE_HEIGHT * 0.4 * finalSize;
+      leaf.rotation.y = angle;
+      plantGroup.add(leaf);
+    }
+    return plantGroup;
+  }
+  
+  // Create leaves based on plant type (growing, mature, harvest 단계)
+  const leafCountMultiplier = growthStage === 'growing' ? 0.7 : 1.0;
+  
+  switch (plantType) {
+    case 'lettuce':
+      // 상추 - 둥근 잎들이 로제트 형태로
+      const lettuceLeafCount = Math.floor(8 * leafCountMultiplier);
+      for (let i = 0; i < lettuceLeafCount; i++) {
+        const leafGeometry = new THREE.SphereGeometry(0.025 * finalSize, 8, 6);
+        leafGeometry.scale(1, 0.3, 1.5); // 납작하고 길쭉한 형태
+        const leaf = new THREE.Mesh(leafGeometry, i % 2 === 0 ? leafMaterial : darkLeafMaterial);
+        const angle = (i / lettuceLeafCount) * Math.PI * 2;
+        const radius = (0.02 + (i % 3) * 0.01) * finalSize;
+        leaf.position.x = Math.cos(angle) * radius;
+        leaf.position.z = Math.sin(angle) * radius;
+        leaf.position.y = PLANT_BASE_HEIGHT * 0.5 * finalSize + (i % 2) * 0.01 * finalSize;
+        leaf.rotation.y = angle;
+        leaf.rotation.x = Math.random() * 0.3 - 0.15;
+        plantGroup.add(leaf);
+      }
+      break;
+      
+    case 'spinach':
+      // 시금치 - 긴 타원형 잎들
+      const spinachLeafCount = Math.floor(6 * leafCountMultiplier);
+      for (let i = 0; i < spinachLeafCount; i++) {
+        const leafGeometry = new THREE.SphereGeometry(0.02 * finalSize, 8, 6);
+        leafGeometry.scale(0.8, 0.2, 2); // 길고 좁은 형태
+        const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+        const angle = (i / spinachLeafCount) * Math.PI * 2;
+        const radius = 0.015 * finalSize;
+        leaf.position.x = Math.cos(angle) * radius;
+        leaf.position.z = Math.sin(angle) * radius;
+        leaf.position.y = PLANT_BASE_HEIGHT * 0.6 * finalSize;
+        leaf.rotation.y = angle;
+        leaf.rotation.x = -0.2;
+        plantGroup.add(leaf);
+      }
+      break;
+      
+    case 'kale':
+      // 케일 - 큰 주름진 잎들
+      const kaleLeafCount = Math.floor(7 * leafCountMultiplier);
+      for (let i = 0; i < kaleLeafCount; i++) {
+        const leafGeometry = new THREE.SphereGeometry(0.03 * finalSize, 8, 8);
+        leafGeometry.scale(1.2, 0.3, 1.8); // 크고 주름진 형태
+        const leaf = new THREE.Mesh(leafGeometry, i % 3 === 0 ? darkLeafMaterial : leafMaterial);
+        const angle = (i / kaleLeafCount) * Math.PI * 2;
+        const radius = 0.02 * finalSize;
+        leaf.position.x = Math.cos(angle) * radius;
+        leaf.position.z = Math.sin(angle) * radius;
+        leaf.position.y = PLANT_BASE_HEIGHT * 0.6 * finalSize + (i % 2) * 0.015 * finalSize;
+        leaf.rotation.y = angle + Math.random() * 0.5;
+        leaf.rotation.x = Math.random() * 0.4 - 0.2;
+        leaf.rotation.z = Math.random() * 0.3 - 0.15;
+        plantGroup.add(leaf);
+      }
+      break;
+      
+    case 'arugula':
+      // 루꼴라 - 깊게 갈라진 잎들
+      const arugulaLeafCount = Math.floor(10 * leafCountMultiplier);
+      for (let i = 0; i < arugulaLeafCount; i++) {
+        const leafGeometry = new THREE.ConeGeometry(0.015 * finalSize, 0.04 * finalSize, 6);
+        const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+        const angle = (i / arugulaLeafCount) * Math.PI * 2;
+        const radius = (0.01 + (i % 3) * 0.005) * finalSize;
+        leaf.position.x = Math.cos(angle) * radius;
+        leaf.position.z = Math.sin(angle) * radius;
+        leaf.position.y = PLANT_BASE_HEIGHT * 0.65 * finalSize;
+        leaf.rotation.y = angle;
+        leaf.rotation.x = Math.random() * 0.6 - 0.3;
+        plantGroup.add(leaf);
+      }
+      break;
+      
+    case 'basil':
+      // 바질 - 작은 타원형 잎들
+      const basilLeafCount = Math.floor(12 * leafCountMultiplier);
+      for (let i = 0; i < basilLeafCount; i++) {
+        const leafGeometry = new THREE.SphereGeometry(0.015 * finalSize, 6, 6);
+        leafGeometry.scale(1, 0.3, 1.5);
+        const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+        const angle = (i / 6) * Math.PI * 2;
+        const layer = Math.floor(i / 6);
+        const radius = (0.015 + layer * 0.01) * finalSize;
+        leaf.position.x = Math.cos(angle) * radius;
+        leaf.position.z = Math.sin(angle) * radius;
+        leaf.position.y = PLANT_BASE_HEIGHT * (0.5 + layer * 0.2) * finalSize;
+        leaf.rotation.y = angle;
+        plantGroup.add(leaf);
+      }
+      break;
+      
+    case 'mint':
+      // 민트 - 톱니 모양 잎들
+      const mintLeafCount = Math.floor(8 * leafCountMultiplier);
+      for (let i = 0; i < mintLeafCount; i++) {
+        const leafGeometry = new THREE.BoxGeometry(0.025 * finalSize, 0.005 * finalSize, 0.035 * finalSize);
+        const leaf = new THREE.Mesh(leafGeometry, leafMaterial);
+        const angle = (i / 4) * Math.PI * 2;
+        const layer = Math.floor(i / 4);
+        const radius = 0.018 * finalSize;
+        leaf.position.x = Math.cos(angle) * radius;
+        leaf.position.z = Math.sin(angle) * radius;
+        leaf.position.y = PLANT_BASE_HEIGHT * (0.5 + layer * 0.3) * finalSize;
+        leaf.rotation.y = angle;
+        leaf.rotation.x = Math.random() * 0.3 - 0.15;
+        plantGroup.add(leaf);
+      }
+      break;
+  }
+  
+  return plantGroup;
+}
+
 
 export const FarmModel: React.FC<FarmModelProps> = ({
   scene,
   zones,
   selectedZoneId,
+  camera,
+  cameraUpdateTrigger,
+  viewMode = 'plant', // 기본값은 식물별 보기
   // onZoneClick, // Not directly used in FarmModel, handled by FarmViewer
   // onSensorClick // Not directly used in FarmModel, handled by FarmViewer
 }) => {
+  const rootModelGroupRef = useRef<THREE.Group>(new THREE.Group()); // Root group for scaling
   const farmGroupRef = useRef<THREE.Group>(new THREE.Group());
   const zoneGroupRef = useRef<THREE.Group>(new THREE.Group());
   const sensorGroupRef = useRef<THREE.Group>(new THREE.Group());
   const lightsGroupRef = useRef<THREE.Group>(new THREE.Group()); // Group for lights
 
+  const [zoneButtonProps, setZoneButtonProps] = useState<ZoneButtonProps[]>([]); // 버튼 상태 추가
+  const [plantSensorButtons, setPlantSensorButtons] = useState<PlantSensorButtonProps[]>([]); // 식물 센서 버튼 상태
+  const [selectedZoneForModal, setSelectedZoneForModal] = useState<FarmZone | null>(null); // 모달용 선택된 구역 상태
+  const [selectedPlantForModal, setSelectedPlantForModal] = useState<PlantSensorButtonProps | null>(null); // 모달용 선택된 식물 상태
+  
+  // 카메라 위치 업데이트를 위한 애니메이션 루프
+  const updateButtonPositions = useCallback(() => {
+    if (!camera || !farmGroupRef.current || !zoneGroupRef.current) return;
+    
+    // 실제 캔버스 크기 가져오기
+    const canvas = document.querySelector('canvas');
+    const canvasWidth = canvas?.clientWidth || window.innerWidth;
+    const canvasHeight = canvas?.clientHeight || window.innerHeight;
+
+    // 구역 버튼 위치 업데이트
+    const newButtonProps: ZoneButtonProps[] = [];
+    zoneGroupRef.current.children.forEach(child => {
+      if (child instanceof THREE.Mesh && child.userData.type === 'zone') {
+        const zoneMesh = child;
+        const zoneId = zoneMesh.userData.zoneId as string;
+        const farmZoneData = zones.find(z => z.id === zoneId);
+
+        if (farmZoneData) {
+          const worldPosition = new THREE.Vector3();
+          zoneMesh.getWorldPosition(worldPosition);
+          const screenPosition = worldPosition.clone().project(camera);
+          const x = (screenPosition.x + 1) / 2 * canvasWidth;
+          const y = (-screenPosition.y + 1) / 2 * canvasHeight;
+          const visible = screenPosition.z < 1 && x >= 0 && x <= canvasWidth && y >= 0 && y <= canvasHeight;
+
+          newButtonProps.push({
+            id: zoneId,
+            name: farmZoneData.name || zoneId,
+            x, y, visible,
+            zoneData: farmZoneData,
+          });
+        }
+      }
+    });
+    setZoneButtonProps(newButtonProps);
+
+    // 식물 센서 버튼 위치 업데이트
+    const newPlantSensorButtons: PlantSensorButtonProps[] = [];
+    
+    // rootModelGroupRef를 통해 스케일링이 적용된 식물들을 찾기
+    rootModelGroupRef.current.traverse(child => {
+      if (child instanceof THREE.Group && child.userData.type === 'plant') {
+        const plantGroup = child;
+        const userData = plantGroup.userData;
+        
+        // 식물의 실제 월드 위치 계산 (스케일링 포함)
+        const worldPosition = new THREE.Vector3();
+        plantGroup.getWorldPosition(worldPosition);
+        
+        // 센서 아이콘을 식물 위 약간 위쪽에 배치
+        const sensorPosition = worldPosition.clone();
+        sensorPosition.y += 0.3; // 스케일링 고려하여 더 높게 설정
+        
+        const screenPosition = sensorPosition.clone().project(camera);
+        
+        // NDC 좌표를 화면 좌표로 변환
+        const x = (screenPosition.x + 1) / 2 * canvasWidth;
+        const y = (-screenPosition.y + 1) / 2 * canvasHeight;
+        
+        // 가시성 체크 (카메라 앞쪽이고 화면 내부에 있는지)
+        const visible = screenPosition.z < 1 && screenPosition.z > -1 && 
+                       x >= 0 && x <= canvasWidth && y >= 0 && y <= canvasHeight;
+        
+        newPlantSensorButtons.push({
+          id: plantGroup.name,
+          plantType: userData.plantType,
+          growthStage: userData.growthStage,
+          healthStatus: userData.healthStatus,
+          x, y, visible,
+          position: userData.position,
+          zoneId: userData.zoneId
+        });
+      }
+    });
+    setPlantSensorButtons(newPlantSensorButtons);
+  }, [camera, zones]);
+
   // Add main groups and basic scene setup
   useEffect(() => {
-    scene.add(farmGroupRef.current);
-    scene.add(zoneGroupRef.current);
-    scene.add(sensorGroupRef.current);
-    scene.add(lightsGroupRef.current);
+    // Add individual groups to the root model group
+    rootModelGroupRef.current.add(farmGroupRef.current);
+    rootModelGroupRef.current.add(zoneGroupRef.current);
+    rootModelGroupRef.current.add(sensorGroupRef.current);
+    rootModelGroupRef.current.add(lightsGroupRef.current);
+
+    // Add the root model group to the scene
+    scene.add(rootModelGroupRef.current);
+
+    // Scale the root model group
+    const scaleFactor = 4.5; // Adjust this value to make the model larger or smaller
+    rootModelGroupRef.current.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
 
     // Sky
     scene.background = new THREE.Color(SKY_COLOR);
@@ -127,7 +974,10 @@ export const FarmModel: React.FC<FarmModelProps> = ({
     groundMesh.rotation.x = -Math.PI / 2; // Rotate to be horizontal
     groundMesh.position.y = -0.05; // Slightly below origin to avoid z-fighting with models at y=0
     groundMesh.receiveShadow = true; // Allow ground to receive shadows
+    // Add ground directly to the scene or to a non-scaled group if it shouldn't be scaled
+    // For now, adding to farmGroup, so it will be scaled. If ground should not scale, add to scene directly.
     farmGroupRef.current.add(groundMesh);
+
 
     // Lighting
     if (lightsGroupRef.current) {
@@ -152,35 +1002,40 @@ export const FarmModel: React.FC<FarmModelProps> = ({
 
 
     return () => {
-      scene.remove(farmGroupRef.current);
-      scene.remove(zoneGroupRef.current);
-      scene.remove(sensorGroupRef.current);
-      scene.remove(lightsGroupRef.current);
+      // Remove the root model group from the scene
+      scene.remove(rootModelGroupRef.current);
       scene.background = null; // Reset background
 
-      [farmGroupRef, zoneGroupRef, sensorGroupRef, lightsGroupRef].forEach(groupRef => {
-        if (groupRef.current) {
-          groupRef.current.traverse(object => {
-            if (object instanceof THREE.Mesh) {
-              object.geometry.dispose();
-              if (Array.isArray(object.material)) {
-                object.material.forEach(material => material.dispose());
-              } else if (object.material) {
-                object.material.dispose();
-              }
-            } else if (object instanceof THREE.Sprite && object.material) {
+      // Dispose of geometries and materials within the rootModelGroup
+      if (rootModelGroupRef.current) {
+        rootModelGroupRef.current.traverse(object => {
+          if (object instanceof THREE.Mesh) {
+            object.geometry.dispose();
+            if (Array.isArray(object.material)) {
+              object.material.forEach(material => material.dispose());
+            } else if (object.material) {
               object.material.dispose();
-              if (object.material.map) {
-                object.material.map.dispose();
-              }
-            } else if (object instanceof THREE.Light) {
-              // Lights don't have geometry/material to dispose in the same way,
-              // but good to handle if specific light disposal is needed.
             }
-          });
-          groupRef.current.clear();
-        }
-      });
+          } else if (object instanceof THREE.Sprite && object.material) {
+            object.material.dispose();
+            if (object.material.map) {
+              object.material.map.dispose();
+            }
+          }
+          // Lights are part of the group and will be removed with it.
+          // Their specific disposal is usually not needed unless they hold complex resources.
+        });
+        // Clear all children from the groups.
+        // The individual groups (farmGroupRef, zoneGroupRef, etc.) are children of rootModelGroupRef.
+        // Clearing rootModelGroupRef will also handle them if they are properly managed.
+        // However, to be safe and explicit, we can clear them individually if they might hold other direct refs.
+        // For simplicity, clearing the root should be enough if all objects are added to it or its children.
+        farmGroupRef.current.clear();
+        zoneGroupRef.current.clear();
+        sensorGroupRef.current.clear();
+        lightsGroupRef.current.clear();
+        rootModelGroupRef.current.clear(); // Clear the root group itself
+      }
     };
   }, [scene]); // Only re-run if scene changes
 
@@ -670,6 +1525,125 @@ export const FarmModel: React.FC<FarmModelProps> = ({
         columnMesh.name = `pipeTier-${i}-B-support-${index}`;
         greenhouseGroup.add(columnMesh);
       });
+
+      // Add Plants to Each Tier
+      const plantTypes = [
+        { A: 'lettuce', B: 'spinach' },  // 1층
+        { A: 'kale', B: 'arugula' },     // 2층
+        { A: 'basil', B: 'mint' }        // 3층
+      ];
+
+      if (i < plantTypes.length) {
+        const tierPlants = plantTypes[i];
+        
+        // Add realistic plants to Bed A
+        for (let row = 0; row < PLANTS_PER_ROW; row++) {
+          for (let col = 0; col < PLANTS_PER_COLUMN; col++) {
+            // 임시 성장 단계 및 건강 상태 (실제로는 백엔드에서 가져와야 함)
+            const growthStages: Array<'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead'> = ['seed', 'sprout', 'growing', 'mature', 'harvest'];
+            const healthStatuses: Array<'healthy' | 'stressed' | 'sick' | 'dead'> = ['healthy', 'stressed', 'sick'];
+            
+            const randomGrowthStage = growthStages[Math.floor(Math.random() * growthStages.length)];
+            const randomHealthStatus = healthStatuses[Math.floor(Math.random() * healthStatuses.length)];
+            const randomSizeMultiplier = 0.8 + Math.random() * 0.4;
+            
+            const plantGroup = createRealisticPlant(
+              tierPlants.A as keyof typeof PLANT_COLORS,
+              randomGrowthStage,
+              randomHealthStatus,
+              randomSizeMultiplier
+            );
+            
+            const plantX = bedAMesh.position.x - (individualBedWidth / 2) + (col + 1) * (individualBedWidth / (PLANTS_PER_COLUMN + 1));
+            const plantY = bedAMesh.position.y + (PIPE_TIER_THICKNESS / 2);
+            const plantZ = bedAMesh.position.z - (tierDepth / 2) + (row + 1) * (tierDepth / (PLANTS_PER_ROW + 1));
+            
+            // Add some random variation
+            plantGroup.position.set(
+              plantX + (Math.random() - 0.5) * 0.01,
+              plantY,
+              plantZ + (Math.random() - 0.5) * 0.01
+            );
+            plantGroup.rotation.y = Math.random() * Math.PI * 2;
+            
+            plantGroup.castShadow = true;
+            plantGroup.receiveShadow = true;
+            plantGroup.name = `plant-${i}-A-${row}-${col}-${tierPlants.A}-${randomGrowthStage}-${randomHealthStatus}`;
+            plantGroup.userData = {
+              type: 'plant',
+              plantType: tierPlants.A,
+              growthStage: randomGrowthStage,
+              healthStatus: randomHealthStatus,
+              zoneId: `floor-${i + 1}-A`,
+              position: { row, col }
+            };
+            
+            // Apply shadow to all children
+            plantGroup.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+            });
+            
+            greenhouseGroup.add(plantGroup);
+          }
+        }
+        
+        // Add realistic plants to Bed B
+        for (let row = 0; row < PLANTS_PER_ROW; row++) {
+          for (let col = 0; col < PLANTS_PER_COLUMN; col++) {
+            // 임시 성장 단계 및 건강 상태 (실제로는 백엔드에서 가져와야 함)
+            const growthStages: Array<'seed' | 'sprout' | 'growing' | 'mature' | 'harvest' | 'dead'> = ['seed', 'sprout', 'growing', 'mature', 'harvest'];
+            const healthStatuses: Array<'healthy' | 'stressed' | 'sick' | 'dead'> = ['healthy', 'stressed', 'sick'];
+            
+            const randomGrowthStage = growthStages[Math.floor(Math.random() * growthStages.length)];
+            const randomHealthStatus = healthStatuses[Math.floor(Math.random() * healthStatuses.length)];
+            const randomSizeMultiplier = 0.8 + Math.random() * 0.4;
+            
+            const plantGroup = createRealisticPlant(
+              tierPlants.B as keyof typeof PLANT_COLORS,
+              randomGrowthStage,
+              randomHealthStatus,
+              randomSizeMultiplier
+            );
+            
+            const plantX = bedBMesh.position.x - (individualBedWidth / 2) + (col + 1) * (individualBedWidth / (PLANTS_PER_COLUMN + 1));
+            const plantY = bedBMesh.position.y + (PIPE_TIER_THICKNESS / 2);
+            const plantZ = bedBMesh.position.z - (tierDepth / 2) + (row + 1) * (tierDepth / (PLANTS_PER_ROW + 1));
+            
+            // Add some random variation
+            plantGroup.position.set(
+              plantX + (Math.random() - 0.5) * 0.01,
+              plantY,
+              plantZ + (Math.random() - 0.5) * 0.01
+            );
+            plantGroup.rotation.y = Math.random() * Math.PI * 2;
+            
+            plantGroup.castShadow = true;
+            plantGroup.receiveShadow = true;
+            plantGroup.name = `plant-${i}-B-${row}-${col}-${tierPlants.B}-${randomGrowthStage}-${randomHealthStatus}`;
+            plantGroup.userData = {
+              type: 'plant',
+              plantType: tierPlants.B,
+              growthStage: randomGrowthStage,
+              healthStatus: randomHealthStatus,
+              zoneId: `floor-${i + 1}-B`,
+              position: { row, col }
+            };
+            
+            // Apply shadow to all children
+            plantGroup.traverse((child) => {
+              if (child instanceof THREE.Mesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+              }
+            });
+            
+            greenhouseGroup.add(plantGroup);
+          }
+        }
+      }
     }
 farmGroupRef.current.add(greenhouseGroup);
     // Ensure zones and sensors are drawn on top or correctly depth-tested
@@ -691,34 +1665,103 @@ farmGroupRef.current.add(greenhouseGroup);
       const tierBaseY = greenhouseInitialYOffset + PIPE_TIER_INITIAL_Y_OFFSET + i * PIPE_TIER_SPACING_Y;
       const zonePosZ = 0; // Centered along the depth of the greenhouse for pipe tiers
 
-      // Section A for tier i+1
-      const zoneIdA = `floor-${i + 1}-A`;
-      const positionXA = -(PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
-      const zoneMeshA = createZoneMesh(
-        zoneIdA,
-        sectionWidth, zoneHeight, tierDepthActual,
-        positionXA, tierBaseY, zonePosZ,
-        selectedZoneId
-      );
-      zoneGroupRef.current.add(zoneMeshA);
+      // Find matching zones from props for this tier
+      const tierZones = zones.filter(zone => zone.level === i + 1);
+      console.log(`Creating zones for tier ${i + 1}, found zones:`, tierZones);
 
-      // Section B for tier i+1
-      const zoneIdB = `floor-${i + 1}-B`;
-      const positionXB = (PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
-      const zoneMeshB = createZoneMesh(
-        zoneIdB,
-        sectionWidth, zoneHeight, tierDepthActual,
-        positionXB, tierBaseY, zonePosZ,
-        selectedZoneId
-      );
-      zoneGroupRef.current.add(zoneMeshB);
+      if (tierZones.length >= 2) {
+        // Section A for tier i+1 - use the first zone's ID
+        const zoneIdA = tierZones[0].id;
+        const positionXA = -(PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
+        const zoneMeshA = createZoneMesh(
+          zoneIdA,
+          sectionWidth, zoneHeight, tierDepthActual,
+          positionXA, tierBaseY, zonePosZ,
+          selectedZoneId
+        );
+        zoneGroupRef.current.add(zoneMeshA);
+
+        // Section B for tier i+1 - use the second zone's ID
+        const zoneIdB = tierZones[1].id;
+        const positionXB = (PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
+        const zoneMeshB = createZoneMesh(
+          zoneIdB,
+          sectionWidth, zoneHeight, tierDepthActual,
+          positionXB, tierBaseY, zonePosZ,
+          selectedZoneId
+        );
+        zoneGroupRef.current.add(zoneMeshB);
+      } else {
+        console.warn(`Not enough zones found for tier ${i + 1}, found ${tierZones.length} zones`);
+        
+        // Fallback to creating zones with generated IDs if no matching zones found
+        const zoneIdA = `zone-${i + 1}-1`;
+        const positionXA = -(PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
+        const zoneMeshA = createZoneMesh(
+          zoneIdA,
+          sectionWidth, zoneHeight, tierDepthActual,
+          positionXA, tierBaseY, zonePosZ,
+          selectedZoneId
+        );
+        zoneGroupRef.current.add(zoneMeshA);
+
+        const zoneIdB = `zone-${i + 1}-2`;
+        const positionXB = (PIPE_TIER_AISLE_WIDTH / 2 + sectionWidth / 2);
+        const zoneMeshB = createZoneMesh(
+          zoneIdB,
+          sectionWidth, zoneHeight, tierDepthActual,
+          positionXB, tierBaseY, zonePosZ,
+          selectedZoneId
+        );
+        zoneGroupRef.current.add(zoneMeshB);
+      }
     }
   // }, [zones, selectedZoneId]); // Original dependencies
   // Dependencies should include selectedZoneId for color updates, and any constants used if they could change.
   // For now, assuming constants are stable and only selectedZoneId triggers re-render of zones for color change.
-  }, [selectedZoneId, NUM_PIPE_TIERS, GREENHOUSE_DEPTH, PIPE_TIER_DEPTH_RATIO, GREENHOUSE_WIDTH, PIPE_TIER_WIDTH_RATIO, PIPE_TIER_AISLE_WIDTH, PIPE_TIER_THICKNESS, greenhouseInitialYOffset, PIPE_TIER_INITIAL_Y_OFFSET, PIPE_TIER_SPACING_Y]);
 
-  // 3. Visualize Sensors
+    // 초기 버튼 위치 설정
+    updateButtonPositions();
+
+  }, [selectedZoneId, NUM_PIPE_TIERS, GREENHOUSE_DEPTH, PIPE_TIER_DEPTH_RATIO, GREENHOUSE_WIDTH, PIPE_TIER_WIDTH_RATIO, PIPE_TIER_AISLE_WIDTH, PIPE_TIER_THICKNESS, greenhouseInitialYOffset, PIPE_TIER_INITIAL_Y_OFFSET, PIPE_TIER_SPACING_Y, camera, zones, scene, updateButtonPositions]);
+
+  // 카메라 움직임에 따른 버튼 위치 업데이트 (더 즉각적으로)
+  useEffect(() => {
+    if (!camera) return;
+
+    let animationFrameId: number;
+    let lastCameraPosition = camera.position.clone();
+    let lastCameraRotation = camera.rotation.clone();
+
+    const checkCameraMovement = () => {
+      // 더 민감한 카메라 움직임 감지 (0.01 -> 0.001)
+      if (camera.position.distanceTo(lastCameraPosition) > 0.001 || 
+          Math.abs(camera.rotation.x - lastCameraRotation.x) > 0.001 ||
+          Math.abs(camera.rotation.y - lastCameraRotation.y) > 0.001 ||
+          Math.abs(camera.rotation.z - lastCameraRotation.z) > 0.001) {
+        
+        updateButtonPositions();
+        lastCameraPosition = camera.position.clone();
+        lastCameraRotation = camera.rotation.clone();
+      }
+      
+      animationFrameId = requestAnimationFrame(checkCameraMovement);
+    };
+
+    checkCameraMovement();
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [camera, updateButtonPositions]);
+  // 카메라 업데이트 트리거에 따른 버튼 위치 업데이트
+  useEffect(() => {
+    if (cameraUpdateTrigger !== undefined) {
+      updateButtonPositions();
+    }
+  }, [cameraUpdateTrigger, updateButtonPositions]);  // 3. Visualize Sensors
   useEffect(() => {
     console.log('[FarmModel] Sensor useEffect triggered. Zones prop:', zones);
     if (sensorGroupRef.current) sensorGroupRef.current.clear();
@@ -773,5 +1816,205 @@ farmGroupRef.current.add(greenhouseGroup);
     });
   }, [zones]); // Assuming loadSensorModel is stable
 
-  return null;
+    // 임시: 선택된 구역 정보 콘솔 출력 (모달 구현 전 확인용)
+  useEffect(() => {
+    if (selectedZoneForModal) {
+      console.log('Zone selected for modal:', selectedZoneForModal.id, selectedZoneForModal);
+    }
+  }, [selectedZoneForModal]);
+
+  return (
+    <>
+      
+      {/* 구역별 보기 - 구역 버튼들 */}
+      {viewMode === 'zone' && zoneButtonProps.map(buttonProp => {
+        if (!buttonProp.visible) return null;
+        
+        // 구역 건강 상태 계산 (해당 구역의 센서들 기준)
+        const getZoneHealthStatus = (zoneData: any) => {
+          if (!zoneData.sensors || zoneData.sensors.length === 0) return 'unknown';
+          
+          const criticalCount = zoneData.sensors.filter((s: any) => s.latest_status === 'critical').length;
+          const warningCount = zoneData.sensors.filter((s: any) => s.latest_status === 'warning').length;
+          
+          if (criticalCount > 0) return 'critical';
+          if (warningCount > 0) return 'warning';
+          return 'normal';
+        };
+        
+        const getZoneIconColor = (status: string) => {
+          switch (status) {
+            case 'normal': return '#10b981'; // 초록색
+            case 'warning': return '#f59e0b'; // 주황색
+            case 'critical': return '#ef4444'; // 빨간색
+            default: return '#6b7280'; // 회색
+          }
+        };
+        
+        const getZoneIcon = (status: string) => {
+          switch (status) {
+            case 'normal': return '🏢'; // 정상 빌딩
+            case 'warning': return '⚠️'; // 경고
+            case 'critical': return '🚨'; // 위험
+            default: return '🏭'; // 기본 공장
+          }
+        };
+        
+        const zoneStatus = getZoneHealthStatus(buttonProp.zoneData);
+        const iconColor = getZoneIconColor(zoneStatus);
+        const zoneIcon = getZoneIcon(zoneStatus);
+        
+        return (
+          <div
+            key={buttonProp.id}
+            style={{
+              position: 'absolute',
+              left: `${buttonProp.x}px`,
+              top: `${buttonProp.y}px`,
+              transform: 'translate(-50%, -50%)',
+              width: '48px',
+              height: '48px',
+              backgroundColor: 'white',
+              border: `3px solid ${iconColor}`,
+              borderRadius: '12px',
+              cursor: 'pointer',
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+              transition: 'all 0.2s ease',
+              fontSize: '16px',
+              fontWeight: 'bold'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+              e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+            }}
+            onClick={() => {
+              console.log(`Button clicked for zone: ${buttonProp.zoneData.id}`);
+              setSelectedZoneForModal(buttonProp.zoneData);
+            }}
+          >
+            {/* 구역 아이콘 */}
+            <div style={{ fontSize: '20px', lineHeight: '1' }}>
+              {zoneIcon}
+            </div>
+            
+            {/* 구역 이름 (축약) */}
+            <div style={{ 
+              fontSize: '8px', 
+              color: iconColor, 
+              marginTop: '2px',
+              textAlign: 'center',
+              lineHeight: '1',
+              maxWidth: '40px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {buttonProp.name.replace('zone-', '').replace('floor-', 'F')}
+            </div>
+            
+            {/* 센서 개수 표시 */}
+            {buttonProp.zoneData.sensors && buttonProp.zoneData.sensors.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '-8px',
+                right: '-8px',
+                width: '16px',
+                height: '16px',
+                backgroundColor: iconColor,
+                color: 'white',
+                borderRadius: '50%',
+                fontSize: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 'bold',
+                border: '2px solid white'
+              }}>
+                {buttonProp.zoneData.sensors.length}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      
+      {/* 식물별 보기 - 식물 센서 아이콘들 */}
+      {viewMode === 'plant' && plantSensorButtons.map(plantButton => {
+        if (!plantButton.visible) return null;
+        
+        // 건강 상태에 따른 아이콘 색상
+        const getIconColor = (healthStatus: string) => {
+          switch (healthStatus) {
+            case 'healthy': return '#10b981'; // 초록색
+            case 'stressed': return '#f59e0b'; // 주황색
+            case 'sick': return '#ef4444'; // 빨간색
+            case 'dead': return '#6b7280'; // 회색
+            default: return '#6b7280';
+          }
+        };
+
+        return (
+          <div
+            key={plantButton.id}
+            style={{
+              position: 'absolute',
+              left: `${plantButton.x}px`,
+              top: `${plantButton.y}px`,
+              transform: 'translate(-50%, -50%)',
+              width: '24px',
+              height: '24px',
+              backgroundColor: 'white',
+              border: `2px solid ${getIconColor(plantButton.healthStatus)}`,
+              borderRadius: '50%',
+              cursor: 'pointer',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '12px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              transition: 'transform 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translate(-50%, -50%) scale(1)';
+            }}
+            onClick={() => {
+              console.log(`Plant sensor clicked for: ${plantButton.plantType}`, plantButton);
+              setSelectedPlantForModal(plantButton);
+            }}
+            title={`${plantButton.plantType} - ${plantButton.healthStatus}`}
+          >
+            🌡️
+          </div>
+        );
+      })}
+      
+      {/* 구역 모달 */}
+      {selectedZoneForModal && (
+        <ZoneInfoModal 
+          zoneData={selectedZoneForModal} 
+          onClose={() => setSelectedZoneForModal(null)} 
+        />
+      )}
+      
+      {/* 식물 센서 모달 */}
+      {selectedPlantForModal && (
+        <PlantSensorModal 
+          plantData={selectedPlantForModal} 
+          onClose={() => setSelectedPlantForModal(null)} 
+        />
+      )}
+    </>
+  );
 };

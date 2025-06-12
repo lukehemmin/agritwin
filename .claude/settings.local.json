@@ -9,7 +9,12 @@
       "Bash(npm run build:*)",
       "Bash(npx tsc:*)",
       "Bash(find:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(mv:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

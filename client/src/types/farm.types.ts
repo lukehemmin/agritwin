@@ -16,6 +16,7 @@ export interface FarmZone {
   sensors?: Sensor[];
   sensor_count?: number;
   health_score?: number;
+  description?: string; // 구역에 대한 설명 추가
 }
 
 export interface FarmStructure {

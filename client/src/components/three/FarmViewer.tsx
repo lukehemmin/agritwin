@@ -10,6 +10,7 @@ interface FarmViewerProps {
   zones: FarmZone[];
   sensorData?: any[]; // Optional sensor data prop
   selectedZone: string | null;
+  viewMode?: 'plant' | 'zone'; // View mode prop from parent
   onZoneSelect?: (zoneId: string | null) => void;
   onSensorSelect?: (sensorId: string) => void;
   className?: string;
@@ -19,10 +20,12 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
   zones,
   sensorData: propSensorData,
   selectedZone,
+  viewMode = 'plant', // Default to plant view if not provided
   onZoneSelect,
   onSensorSelect,
   className = ''
 }) => {
+  const [cameraUpdateTrigger, setCameraUpdateTrigger] = useState(0);
   console.log('🌍 FarmViewer: Rendering with', { 
     zones: zones.length, 
     selectedZone,
@@ -117,7 +120,13 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
     let animationId: number;
 
     const animate = () => {
-      controls.update();
+      const controlsChanged = controls.update();
+      
+      // 카메라가 움직였을 때 업데이트 트리거
+      if (controlsChanged) {
+        setCameraUpdateTrigger(prev => prev + 1);
+      }
+      
       renderer.render(scene, camera);
       animationId = requestAnimationFrame(animate);
     };
@@ -165,24 +174,29 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
       )}
 
       {/* 3D Content */}
-      {!isLoading && !error && scene && (
+      {!isLoading && !error && scene && camera && (
         <>
           {/* 3D Farm Model */}
           <FarmModel
             scene={scene}
             zones={zones}
             selectedZoneId={selectedZone} // Renamed from selectedZone
+            camera={camera} // Add camera prop
+            cameraUpdateTrigger={cameraUpdateTrigger} // Add camera update trigger
+            viewMode={viewMode} // Add view mode prop
             // sensorData prop removed as it's no longer in FarmModelProps
             onZoneClick={onZoneSelect}
             onSensorClick={onSensorSelect}
           />
 
           {/* Controls Info */}
-          <div className="absolute top-4 left-4 bg-black bg-opacity-70 text-white text-xs p-3 rounded-lg z-20">
-            <div className="space-y-1">
-              <div>🖱️ 마우스: 회전 및 줌</div>
-              <div>👆 클릭: 구역/센서 선택</div>
-              <div>🎯 휠: 확대/축소</div>
+          <div className="absolute top-4 left-4 flex flex-col space-y-2 z-20">
+            <div className="bg-black bg-opacity-70 text-white text-xs p-3 rounded-lg">
+              <div className="space-y-1">
+                <div>🖱️ 마우스: 회전 및 줌</div>
+                <div>👆 클릭: {viewMode === 'plant' ? '식물 센서' : '구역'} 선택</div>
+                <div>🎯 휠: 확대/축소</div>
+              </div>
             </div>
           </div>
 
@@ -200,11 +214,23 @@ export const FarmViewer: React.FC<FarmViewerProps> = ({
 
           {/* Status Indicators */}
           <div className="absolute bottom-4 left-4 flex space-x-2 z-20">
+            {viewMode === 'zone' && (
+              <div className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                🏠 구역: {zones.length}개
+              </div>
+            )}
+            {viewMode === 'plant' && (
+              <>
+                <div className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                  🌱 총 식물: {zones.length > 0 ? 3 * 2 * 6 * 6 : 0}개 {/* 3층 * 2구역 * 6x6 식물 */}
+                </div>
+                <div className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                  🌡️ 활성 센서: {zones.length * 2}개 {/* 각 구역마다 2개 식물 타입 센서 */}
+                </div>
+              </>
+            )}
             <div className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-              구역: {zones.length}개
-            </div>
-            <div className="bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-              센서: {sensorData.length}개 ({sensorData.filter(s => s.status === 'critical' || s.status === 'warning').length}개 주의/위험)
+              📊 실시간 데이터: {sensorData.filter(s => s.status === 'critical' || s.status === 'warning').length}개 주의/위험
             </div>
           </div>
         </>

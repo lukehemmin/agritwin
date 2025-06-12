@@ -15,6 +15,7 @@ import { Sensor } from '../types/sensor.types';
 const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'plant' | 'zone'>('plant'); // 식물별 보기 vs 구역별 보기
   const [timeRange, setTimeRange] = useState<[Date, Date]>([
     new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
     new Date()
@@ -350,18 +351,48 @@ const Dashboard: React.FC = () => {
           <div className="flex-shrink-0 p-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900">3D 농장 뷰</h2>
-              <ZoneSelector
-                zones={processedZones.map(zone => ({ // farmStructure.zones 대신 processedZones 사용
-                  id: zone.id,
-                  name: zone.name,
-                  level: zone.level,
-                  cropType: zone.crop_type,
-                  sensorCount: zone.sensor_count || 0, // 이제 zone.sensor_count가 useEffect에서 업데이트됨
-                  healthScore: Math.round(Math.random() * 20 + 80) // Placeholder health score
-                }))}
-                selectedZone={selectedZone}
-                onZoneSelect={setSelectedZone}
-              />
+              <div className="flex items-center space-x-4">
+                {/* View Mode Toggle */}
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600 font-medium">보기 모드:</span>
+                  <div className="flex space-x-1 border border-gray-300 rounded-lg p-1 bg-gray-100">
+                    <button
+                      onClick={() => setViewMode('plant')}
+                      className={`px-3 py-2 text-sm rounded-md transition-all duration-200 font-medium ${
+                        viewMode === 'plant'
+                          ? 'bg-green-500 text-white shadow-md transform scale-105'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 hover:text-green-600 border border-transparent hover:border-green-200'
+                      }`}
+                    >
+                      🌱 식물별 보기
+                    </button>
+                    <button
+                      onClick={() => setViewMode('zone')}
+                      className={`px-3 py-2 text-sm rounded-md transition-all duration-200 font-medium ${
+                        viewMode === 'zone'
+                          ? 'bg-blue-500 text-white shadow-md transform scale-105'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 border border-transparent hover:border-blue-200'
+                      }`}
+                    >
+                      🏠 구역별 보기
+                    </button>
+                  </div>
+                </div>
+
+                {/* Zone Selector */}
+                <ZoneSelector
+                  zones={processedZones.map(zone => ({ // farmStructure.zones 대신 processedZones 사용
+                    id: zone.id,
+                    name: zone.name,
+                    level: zone.level,
+                    cropType: zone.crop_type,
+                    sensorCount: zone.sensor_count || 0, // 이제 zone.sensor_count가 useEffect에서 업데이트됨
+                    healthScore: Math.round(Math.random() * 20 + 80) // Placeholder health score
+                  }))}
+                  selectedZone={selectedZone}
+                  onZoneSelect={setSelectedZone}
+                />
+              </div>
             </div>
           </div>
           
@@ -370,6 +401,7 @@ const Dashboard: React.FC = () => {
               zones={processedZones} // farmStructure.zones 대신 processedZones 사용
               sensorData={sensorData}
               selectedZone={selectedZone}
+              viewMode={viewMode} // Pass view mode to FarmViewer
               onZoneSelect={setSelectedZone}
               onSensorSelect={(sensorId) => {
                 console.log('Sensor selected:', sensorId);
