@@ -26,7 +26,7 @@ export const useThreeJS = (): ThreeJSHook => {
 
       // Scene 생성
       const newScene = new THREE.Scene();
-      newScene.background = new THREE.Color(0xe8f5e8); // 연한 녹색 배경
+      newScene.background = new THREE.Color(0xa8d5a8); // 자연스러운 농장 그린 배경
 
       // 부모 컨테이너 크기 가져오기
       const parent = canvasRef.current.parentElement;

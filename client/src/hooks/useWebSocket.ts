@@ -22,15 +22,18 @@ export const useWebSocket = (): WebSocketHook => {
   const [error, setError] = useState<any>(null);
 
   useEffect(() => {
-    // Set up event listeners
-    websocketService.onConnect((connected) => {
+    console.log('🔧 useWebSocket: Setting up event listeners...');
+    
+    // Set up event listeners and store cleanup functions
+    const cleanupConnect = websocketService.onConnect((connected) => {
+      console.log('🔧 useWebSocket: Connection status changed:', connected);
       setIsConnected(connected);
       if (connected) {
         setError(null);
       }
     });
 
-    websocketService.onSensorData((data) => {
+    const cleanupSensorData = websocketService.onSensorData((data) => {
       console.log('🔄 useWebSocket: Updating sensor data state', { 
         newDataCount: data.length,
         sampleData: data.slice(0, 2),
@@ -44,11 +47,11 @@ export const useWebSocket = (): WebSocketHook => {
       });
     });
 
-    websocketService.onAlert((alert) => {
+    const cleanupAlert = websocketService.onAlert((alert) => {
       setAlerts(prev => [alert, ...prev].slice(0, 50)); // Keep only last 50 alerts
     });
 
-    websocketService.onStatusChange((status: SensorStatusChange) => {
+    const cleanupStatusChange = websocketService.onStatusChange((status: SensorStatusChange) => {
       // Update sensor data when status changes
       setSensorData(prev => prev.map(sensor => 
         sensor.sensor_id === status.sensorId 
@@ -57,20 +60,29 @@ export const useWebSocket = (): WebSocketHook => {
       ));
     });
 
-    websocketService.onAlertResolve((resolution: AlertResolution) => {
+    const cleanupAlertResolve = websocketService.onAlertResolve((resolution: AlertResolution) => {
       // Remove resolved alert from list
       setAlerts(prev => prev.filter((_, index) => index !== resolution.alertId));
     });
 
-    websocketService.onSocketError((socketError) => {
+    const cleanupError = websocketService.onSocketError((socketError) => {
       setError(socketError);
     });
 
     // Initial connection status
-    setIsConnected(websocketService.isConnected());
+    const currentStatus = websocketService.isConnected();
+    console.log('🔧 useWebSocket: Initial connection status:', currentStatus);
+    setIsConnected(currentStatus);
 
     // Cleanup on unmount
     return () => {
+      console.log('🔧 useWebSocket: Cleaning up event listeners...');
+      cleanupConnect();
+      cleanupSensorData();
+      cleanupAlert();
+      cleanupStatusChange();
+      cleanupAlertResolve();
+      cleanupError();
       websocketService.unsubscribeAll();
     };
   }, []);

@@ -14,18 +14,33 @@ interface NotificationToastProps {
   notifications: ToastNotification[];
   onClose: (id: string) => void;
   onClickNotification?: (id: string) => void;
+  maxVisible?: number;
 }
 
 export const NotificationToast: React.FC<NotificationToastProps> = ({
   notifications,
   onClose,
-  onClickNotification
+  onClickNotification,
+  maxVisible = 2
 }) => {
   const [visibleNotifications, setVisibleNotifications] = useState<ToastNotification[]>([]);
 
   useEffect(() => {
-    setVisibleNotifications(notifications);
-  }, [notifications]);
+    // 최신 알림을 우선으로 maxVisible 개수만큼만 표시
+    const latestNotifications = notifications
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, maxVisible);
+    
+    setVisibleNotifications(latestNotifications);
+    
+    // 오래된 알림들을 자동으로 닫기
+    if (notifications.length > maxVisible) {
+      const oldNotifications = notifications.slice(maxVisible);
+      oldNotifications.forEach(notification => {
+        setTimeout(() => onClose(notification.id), 100);
+      });
+    }
+  }, [notifications, maxVisible, onClose]);
 
   useEffect(() => {
     // Auto-close notifications after their duration
@@ -70,19 +85,20 @@ export const NotificationToast: React.FC<NotificationToastProps> = ({
   if (visibleNotifications.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2 max-w-sm">
+    <div className="fixed top-20 right-4 z-50 space-y-3 max-w-sm">
       {visibleNotifications.map((notification, index) => (
         <div
           key={notification.id}
           className={`
             border rounded-lg shadow-lg p-4 transform transition-all duration-300 ease-out
             ${getToastStyle(notification.severity)}
-            ${index === 0 ? 'animate-slide-in' : ''}
-            cursor-pointer hover:shadow-xl
+            cursor-pointer hover:shadow-xl hover:scale-105
+            ${index > 0 ? 'opacity-90' : ''}
           `}
           style={{
-            animation: index === 0 ? 'slideIn 0.3s ease-out' : 'none',
-            transform: `translateY(${index * 4}px) scale(${1 - index * 0.02})`
+            animation: 'slideInRight 0.3s ease-out',
+            transform: `translateY(${index * 2}px) scale(${1 - index * 0.03})`,
+            zIndex: 1000 - index
           }}
           onClick={() => onClickNotification?.(notification.id)}
         >

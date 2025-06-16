@@ -91,6 +91,7 @@ function App() {
         <Sidebar />
         
         <main className="flex-1 overflow-hidden">
+          <div className="h-full overflow-y-auto">
           <React.Suspense fallback={<Loading />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
@@ -100,6 +101,7 @@ function App() {
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </React.Suspense>
+          </div>
         </main>
       </div>
 
@@ -116,6 +118,7 @@ function App() {
         notifications={toastNotifications}
         onClose={handleCloseToast}
         onClickNotification={handleClickToast}
+        maxVisible={2}
       />
     </div>
   );

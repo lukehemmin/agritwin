@@ -43,6 +43,28 @@ body {
   }
 }
 
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%) scale(0.8);
+    opacity: 0;
+  }
+}
+
 @keyframes progress {
   from {
     width: 100%;
@@ -54,6 +76,14 @@ body {
 
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 센서 상태 클래스 */

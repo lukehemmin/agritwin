@@ -16,12 +16,14 @@ import sensorsRouter from './routes/sensors';
 import farmRouter from './routes/farm';
 import analyticsRouter, { initializeAnalytics } from './routes/analytics';
 import plantsRouter from './routes/plants';
+import aiRouter from './routes/ai';
 
 // WebSocket handlers
 import { setupSocketHandlers } from './websocket/socketHandlers';
 
 // Services
 import { PlantGrowthSimulator } from './services/PlantGrowthSimulator';
+import { AIFarmManager } from './services/AIFarmManager';
 
 // Load environment variables
 dotenv.config();
@@ -62,6 +64,11 @@ async function startServer() {
     app.locals.db = db;
     app.locals.io = io;
 
+    // Initialize AI Farm Manager
+    const aiApiKey = process.env.GOOGLE_AI_API_KEY || 'AIzaSyARZHxkAYRF1JPmAUruJqD5X6o_u74y3iE';
+    const aiManager = new AIFarmManager(db, aiApiKey);
+    app.locals.aiManager = aiManager;
+
     // Initialize analytics service
     initializeAnalytics(db);
 
@@ -70,6 +77,7 @@ async function startServer() {
     app.use('/api/farm', farmRouter);
     app.use('/api/analytics', analyticsRouter);
     app.use('/api/plants', plantsRouter);
+    app.use('/api/ai', aiRouter);
 
     // Health check endpoint
     app.get('/api/health', (req, res) => {

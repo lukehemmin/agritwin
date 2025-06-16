@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Thermometer, Droplets, Lightbulb, Wind, Gauge } from 'lucide-react';
 import { SensorData } from '../../services/websocket';
 
@@ -9,6 +9,8 @@ interface SensorPanelProps {
 }
 
 export const SensorPanel: React.FC<SensorPanelProps> = ({ selectedZone, sensorData, isConnected }) => {
+  const [displayData, setDisplayData] = useState<Record<string, SensorData>>({});
+  
   console.log('🎛️ SensorPanel: Rendering with data', { 
     sensorDataCount: sensorData.length, 
     selectedZone, 
@@ -16,18 +18,27 @@ export const SensorPanel: React.FC<SensorPanelProps> = ({ selectedZone, sensorDa
     sampleData: sensorData.slice(0, 2)
   });
 
-  // Group sensor data by type and get latest values
-  const sensorGroups = sensorData.reduce((acc, data) => {
-    const sensorType = data.sensor_id.split('-').pop(); // Extract type from sensor_id
-    if (!sensorType) return acc;
-    
-    if (!acc[sensorType] || new Date(data.timestamp) > new Date(acc[sensorType].timestamp)) {
-      acc[sensorType] = data;
-    }
-    return acc;
-  }, {} as Record<string, SensorData>);
+  // Debounce sensor data updates - 1초마다만 업데이트
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Group sensor data by type and get latest values
+      const sensorGroups = sensorData.reduce((acc, data) => {
+        const sensorType = data.sensor_id.split('-').pop(); // Extract type from sensor_id
+        if (!sensorType) return acc;
+        
+        if (!acc[sensorType] || new Date(data.timestamp) > new Date(acc[sensorType].timestamp)) {
+          acc[sensorType] = data;
+        }
+        return acc;
+      }, {} as Record<string, SensorData>);
+      
+      setDisplayData(sensorGroups);
+    }, 1000); // 1초 디바운스
 
-  console.log('🎛️ SensorPanel: Grouped sensor data', sensorGroups);
+    return () => clearTimeout(timer);
+  }, [sensorData]);
+
+  console.log('🎛️ SensorPanel: Display data', displayData);
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -51,25 +62,18 @@ export const SensorPanel: React.FC<SensorPanelProps> = ({ selectedZone, sensorDa
     }
   };
 
-  // 선택된 구역 필터링
-  let filteredData = sensorData;
+  // Filter display data for selected zone if any
+  let finalDisplayData = displayData;
   if (selectedZone) {
-    filteredData = sensorData.filter(data => data.sensor_id.includes(selectedZone));
-    console.log('🎛️ SensorPanel: Zone filtered', { zone: selectedZone, count: filteredData.length });
+    finalDisplayData = Object.fromEntries(
+      Object.entries(displayData).filter(([_, data]) => 
+        data.sensor_id.includes(selectedZone)
+      )
+    );
+    console.log('🎛️ SensorPanel: Zone filtered', { zone: selectedZone, count: Object.keys(finalDisplayData).length });
   }
 
-  // 실시간 센서 데이터 처리
-  const realtimeSensorGroups = filteredData.reduce((acc, data) => {
-    const sensorType = data.sensor_id.split('-').pop();
-    if (!sensorType) return acc;
-    
-    if (!acc[sensorType] || new Date(data.timestamp) > new Date(acc[sensorType].timestamp)) {
-      acc[sensorType] = data;
-    }
-    return acc;
-  }, {} as Record<string, SensorData>);
-
-  const sensors = Object.entries(realtimeSensorGroups).map(([type, data]) => ({
+  const sensors = Object.entries(finalDisplayData).map(([type, data]) => ({
     id: data.sensor_id,
     type,
     name: getSensorDisplayName(type),
@@ -131,36 +135,55 @@ export const SensorPanel: React.FC<SensorPanelProps> = ({ selectedZone, sensorDa
             연결됨: {isConnected ? '✅' : '❌'} | 
             데이터 개수: {sensorData.length}개 | 
             구역: {selectedZone || '전체'} |
-            필터됨: {filteredData.length}개
+            필터됨: {Object.keys(finalDisplayData).length}개
           </p>
         </div>
       ) : (
         <div className="space-y-3">
           {sensors.map((sensor) => (
-            <div key={sensor.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <sensor.icon size={20} className="text-gray-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">{sensor.name}</p>
-                  <div className="flex items-center space-x-2">
-                    <div className={getStatusDotClass(sensor.status)}></div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusClass(sensor.status)}`}>
-                      {sensor.status === 'normal' ? '정상' : 
-                       sensor.status === 'warning' ? '경고' : '위험'}
-                    </span>
+            <div key={sensor.id} className="p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
+              {/* 센서 헤더 */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-full ${
+                    sensor.status === 'normal' ? 'bg-green-100' :
+                    sensor.status === 'warning' ? 'bg-yellow-100' : 'bg-red-100'
+                  }`}>
+                    <sensor.icon size={18} className={
+                      sensor.status === 'normal' ? 'text-green-600' :
+                      sensor.status === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                    } />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">{sensor.name}</p>
                   </div>
                 </div>
+                <div className={`px-3 py-1 rounded-full text-xs font-bold ${
+                  sensor.status === 'normal' ? 'bg-green-100 text-green-700' :
+                  sensor.status === 'warning' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                }`}>
+                  {sensor.status === 'normal' ? '✓ 정상' : 
+                   sensor.status === 'warning' ? '⚠ 경고' : '⚠ 위험'}
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-gray-900">
-                  {typeof sensor.value === 'number' ? sensor.value.toLocaleString() : sensor.value}
-                </p>
-                <p className="text-sm text-gray-500">{sensor.unit}</p>
-                <p className="text-xs text-gray-400">
-                  {new Date(sensor.timestamp).toLocaleTimeString()}
-                </p>
+
+              {/* 센서 값 표시 */}
+              <div className="flex items-end justify-between">
+                <div className="flex-1">
+                  <div className="text-3xl font-bold text-gray-900 mb-1">
+                    {typeof sensor.value === 'number' ? sensor.value.toFixed(1) : sensor.value}
+                    <span className="text-lg text-gray-500 ml-2">{sensor.unit}</span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    마지막 업데이트: {new Date(sensor.timestamp).toLocaleTimeString()}
+                  </div>
+                </div>
+                
+                {/* 상태 표시기 */}
+                <div className={`w-4 h-4 rounded-full ${
+                  sensor.status === 'normal' ? 'bg-green-500' :
+                  sensor.status === 'warning' ? 'bg-yellow-500' : 'bg-red-500'
+                } animate-pulse`}></div>
               </div>
             </div>
           ))}

@@ -73,7 +73,7 @@ export const FARM_CONFIG = {
 };
 
 export const UPDATE_INTERVALS = {
-  SENSOR_DATA: 2000, // 2초 (더 빠른 실시간 업데이트)
-  ALERTS_CHECK: 5000, // 5초
+  SENSOR_DATA: 5000, // 5초 (현실적인 센서 업데이트 간격)
+  ALERTS_CHECK: 10000, // 10초
   DATABASE_CLEANUP: 3600000 // 1시간
 };

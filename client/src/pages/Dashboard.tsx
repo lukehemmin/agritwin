@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FarmViewer } from '../components/three/FarmViewer';
 import { SensorPanel } from '../components/dashboard/SensorPanel';
+import { ZoneComparisonPanel } from '../components/dashboard/ZoneComparisonPanel';
+import { AIInsightPanel } from '../components/ai/AIInsightPanel';
 import { ChartModal } from '../components/charts/ChartModal';
 import { ZoneSelector } from '../components/controls/ZoneSelector';
 import { TimeRange } from '../components/controls/TimeRange';
@@ -15,6 +17,7 @@ const Dashboard: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'plant' | 'zone'>('plant'); // 식물별 보기 vs 구역별 보기
+  const [rightPanelMode, setRightPanelMode] = useState<'zones' | 'sensors' | 'ai'>('zones'); // 오른쪽 패널 모드
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [timeRange, setTimeRange] = useState<[Date, Date]>([
     new Date(Date.now() - 24 * 60 * 60 * 1000), // 24 hours ago
@@ -232,10 +235,10 @@ const Dashboard: React.FC = () => {
 
 
   return (
-    <div className="dashboard-layout h-screen flex flex-col bg-gray-50">
+    <div className="dashboard-layout h-screen flex flex-col bg-gray-50 overflow-hidden">
       {/* Top Controls */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-3 max-h-none">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex-shrink-0 bg-white border-b border-gray-200 p-3">
+        <div className="flex items-center justify-between gap-4 min-w-0">
           <div className="flex items-center space-x-4">
             <h1 className="text-2xl font-bold text-gray-900">농장 대시보드</h1>
             <div className="flex items-center space-x-2 text-sm">
@@ -244,51 +247,30 @@ const Dashboard: React.FC = () => {
                 {isConnected ? "실시간 연결됨" : "연결 끊김"}
               </span>
               {wsError && <span className="text-red-500">({wsError.message})</span>}
+              {!isConnected && (
+                <button 
+                  onClick={() => window.location.reload()} 
+                  className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                >
+                  재연결
+                </button>
+              )}
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-4 flex-shrink-0">
             <TimeRange 
               value={timeRange}
               onChange={setTimeRange}
             />
             
-            <button className="btn-primary">
+            <button className="btn-primary whitespace-nowrap">
               데이터 내보내기
             </button>
           </div>
         </div>
 
 
-        {/* Real-time data info */}
-        {sensorData.length > 0 && (
-          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-blue-700">
-                📊 실시간: {sensorData.length}개 센서
-              </span>
-              <span className="text-blue-600">
-                업데이트: {sensorData.length > 0 ? 
-                  new Date(Math.max(...sensorData.map(d => new Date(d.timestamp).getTime()))).toLocaleTimeString() 
-                  : 'N/A'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Alerts info */}
-        {alerts.length > 0 && (
-          <div className="mt-1 p-2 bg-orange-50 border border-orange-200 rounded text-xs flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <span className="text-orange-700">
-                🚨 알림: {alerts.length}개
-              </span>
-              <span className="text-orange-600">
-                최신: {alerts[0]?.message.substring(0, 30)}...
-              </span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Main Content */}
@@ -360,19 +342,90 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Panel - Sensor Panel + Control Panel */}
-        <div className="w-80 xl:w-96 flex flex-col bg-gray-50 overflow-hidden flex-shrink-0">
-          {/* Sensor Panel - 더 많은 공간 할당 */}
-          <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: '60vh' }}>
-            <SensorPanel 
-              selectedZone={selectedZone}
-              sensorData={sensorData}
-              isConnected={isConnected}
-            />
+        {/* Right Panel - 선택 가능한 패널 + Control Panel */}
+        <div className="w-80 xl:w-96 flex flex-col bg-gray-50 flex-shrink-0 h-full">
+          {/* Panel Mode Toggle */}
+          <div className="flex-shrink-0 p-4 border-b border-gray-200">
+            <div className="grid grid-cols-3 gap-1 border border-gray-300 rounded-lg p-1 bg-gray-100">
+              <button
+                onClick={() => setRightPanelMode('zones')}
+                className={`px-2 py-2 text-xs rounded-md transition-all duration-200 font-medium ${
+                  rightPanelMode === 'zones'
+                    ? 'bg-blue-500 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600'
+                }`}
+              >
+                🏠 구역
+              </button>
+              <button
+                onClick={() => setRightPanelMode('sensors')}
+                className={`px-2 py-2 text-xs rounded-md transition-all duration-200 font-medium ${
+                  rightPanelMode === 'sensors'
+                    ? 'bg-green-500 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 hover:text-green-600'
+                }`}
+              >
+                📊 센서
+              </button>
+              <button
+                onClick={() => setRightPanelMode('ai')}
+                className={`px-2 py-2 text-xs rounded-md transition-all duration-200 font-medium ${
+                  rightPanelMode === 'ai'
+                    ? 'bg-purple-500 text-white shadow-md'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 hover:text-purple-600'
+                }`}
+              >
+                🤖 AI
+              </button>
+            </div>
+          </div>
+
+          {/* Main Panel Content */}
+          <div className="flex-1 overflow-hidden flex flex-col border-b border-gray-200">
+            {rightPanelMode === 'zones' && (
+              <>
+                <div className="flex-shrink-0 p-4 pb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">구역 현황 비교</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 pb-4">
+                  <ZoneComparisonPanel
+                    zones={processedZones}
+                    sensorData={sensorData}
+                    selectedZone={selectedZone}
+                  />
+                </div>
+              </>
+            )}
+            
+            {rightPanelMode === 'sensors' && (
+              <>
+                <div className="flex-shrink-0 p-4 pb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">센서 현황</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 pb-4">
+                  <SensorPanel 
+                    selectedZone={selectedZone}
+                    sensorData={sensorData}
+                    isConnected={isConnected}
+                  />
+                </div>
+              </>
+            )}
+
+            {rightPanelMode === 'ai' && (
+              <>
+                <div className="flex-shrink-0 p-4 pb-2">
+                  <h3 className="text-lg font-semibold text-gray-900">AI 농장 관리</h3>
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 pb-4">
+                  <AIInsightPanel selectedZone={selectedZone} />
+                </div>
+              </>
+            )}
           </div>
           
-          {/* Control Panel - 컴팩트하게 표시 */}
-          <div className="flex-shrink-0 p-3 border-t border-gray-200">
+          {/* Control Panel - 컴팩트하게 표시 (고정) */}
+          <div className="flex-shrink-0 p-3">
             <FarmControlPanel
               onLightingControl={(tier, side, action) => {
                 console.log(`조명 제어: ${tier}층 ${side}구역 ${action}`);

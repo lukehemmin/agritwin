@@ -741,7 +741,7 @@ const DEFAULT_ZONE_COLOR = 0x007bff; // Blue - Can be changed to a more earthy t
 const SELECTED_ZONE_COLOR = 0x28a745; // Green
 const ZONE_OPACITY = 0.5; // Slightly increased opacity for better visibility
 const GROUND_COLOR = 0x8B4513; // Brown for soil, or 0x228B22 for grass
-const SKY_COLOR = 0x87CEEB; // Sky blue
+const SKY_COLOR = 0xc8e6c9; // Natural light green - 농장 환경에 어울리는 연한 녹색
 
 // Simplified Greenhouse Model Constants
 const GREENHOUSE_WIDTH = 3.5; // X-axis (across gable end)
@@ -1390,7 +1390,7 @@ export const FarmModel: React.FC<FarmModelProps> = ({
     rootModelGroupRef.current.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
 
-    // Sky
+    // Sky - 농장 환경에 어울리는 연한 녹색 배경
     scene.background = new THREE.Color(SKY_COLOR);
 
     // Ground Plane

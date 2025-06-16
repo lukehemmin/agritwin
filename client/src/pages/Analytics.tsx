@@ -112,7 +112,7 @@ const Analytics: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen overflow-y-auto p-6 space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>

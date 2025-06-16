@@ -35,31 +35,41 @@ export class WebSocketService {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  private static instance: WebSocketService | null = null;
 
-  // Event callbacks
-  private onConnectionChange?: (connected: boolean) => void;
-  private onSensorDataUpdate?: (data: SensorData[]) => void;
-  private onSensorAlert?: (alert: AlertData) => void;
-  private onSensorStatusChange?: (status: SensorStatusChange) => void;
-  private onAlertResolution?: (resolution: AlertResolution) => void;
-  private onError?: (error: any) => void;
+  // Event callbacks - using arrays to support multiple listeners
+  private onConnectionChangeCallbacks: ((connected: boolean) => void)[] = [];
+  private onSensorDataUpdateCallbacks: ((data: SensorData[]) => void)[] = [];
+  private onSensorAlertCallbacks: ((alert: AlertData) => void)[] = [];
+  private onSensorStatusChangeCallbacks: ((status: SensorStatusChange) => void)[] = [];
+  private onAlertResolutionCallbacks: ((resolution: AlertResolution) => void)[] = [];
+  private onErrorCallbacks: ((error: any) => void)[] = [];
 
   constructor() {
+    if (WebSocketService.instance) {
+      console.log('🔌 Returning existing WebSocket instance');
+      return WebSocketService.instance;
+    }
+    console.log('🔌 Creating new WebSocket instance');
+    WebSocketService.instance = this;
     this.connect();
   }
 
   private connect() {
     if (this.socket?.connected) {
+      console.log('🔌 WebSocket already connected, skipping');
       return;
     }
 
     const serverUrl = import.meta.env.VITE_WS_URL || 'http://localhost:5001';
+    console.log('🔌 Attempting to connect to WebSocket server:', serverUrl);
     
     this.socket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       upgrade: true,
       rememberUpgrade: true,
       timeout: 10000,
+      forceNew: true,
     });
 
     this.setupEventListeners();
@@ -72,7 +82,7 @@ export class WebSocketService {
     this.socket.on('connect', () => {
       console.log('✅ WebSocket connected');
       this.reconnectAttempts = 0;
-      this.onConnectionChange?.(true);
+      this.onConnectionChangeCallbacks.forEach(callback => callback(true));
       
       // 연결 즉시 센서 데이터 구독
       setTimeout(() => {
@@ -84,7 +94,7 @@ export class WebSocketService {
 
     this.socket.on('disconnect', (reason) => {
       console.log('❌ WebSocket disconnected:', reason);
-      this.onConnectionChange?.(false);
+      this.onConnectionChangeCallbacks.forEach(callback => callback(false));
       
       // Auto-reconnect on unexpected disconnection
       if (reason === 'io server disconnect') {
@@ -97,7 +107,7 @@ export class WebSocketService {
 
     this.socket.on('connect_error', (error) => {
       console.error('🔌 WebSocket connection error:', error);
-      this.onError?.(error);
+      this.onErrorCallbacks.forEach(callback => callback(error));
       this.handleReconnection();
     });
 
@@ -109,29 +119,29 @@ export class WebSocketService {
     // Sensor data events
     this.socket.on('sensor-data:update', (data: SensorData[]) => {
       console.log('🔄 Real-time sensor data update:', data.length, 'sensors', data.slice(0, 2));
-      this.onSensorDataUpdate?.(data);
+      this.onSensorDataUpdateCallbacks.forEach(callback => callback(data));
     });
 
     this.socket.on('sensor-data:current', (data: any[]) => {
       console.log('📊 Current sensor data:', data.length, 'sensors', data.slice(0, 2));
-      this.onSensorDataUpdate?.(data);
+      this.onSensorDataUpdateCallbacks.forEach(callback => callback(data));
     });
 
     // Alert events
     this.socket.on('sensor:alert', (alert: AlertData) => {
       console.log('🚨 Sensor alert:', alert.severity, alert.message);
-      this.onSensorAlert?.(alert);
+      this.onSensorAlertCallbacks.forEach(callback => callback(alert));
     });
 
     this.socket.on('alert:resolved', (resolution: AlertResolution) => {
       console.log('✅ Alert resolved:', resolution.alertId);
-      this.onAlertResolution?.(resolution);
+      this.onAlertResolutionCallbacks.forEach(callback => callback(resolution));
     });
 
     // Status change events
     this.socket.on('sensor:status-changed', (status: SensorStatusChange) => {
       console.log('🔄 Sensor status changed:', status.sensorId, status.isActive);
-      this.onSensorStatusChange?.(status);
+      this.onSensorStatusChangeCallbacks.forEach(callback => callback(status));
     });
 
     // Zone data events
@@ -147,7 +157,7 @@ export class WebSocketService {
     // Error handling
     this.socket.on('error', (error: any) => {
       console.error('❌ Socket error:', error);
-      this.onError?.(error);
+      this.onErrorCallbacks.forEach(callback => callback(error));
     });
   }
 
@@ -196,29 +206,53 @@ export class WebSocketService {
     this.socket?.emit('alert:resolve', alertId);
   }
 
-  // Event listener setters
+  // Event listener setters - now supports multiple listeners
   public onConnect(callback: (connected: boolean) => void) {
-    this.onConnectionChange = callback;
+    this.onConnectionChangeCallbacks.push(callback);
+    return () => {
+      const index = this.onConnectionChangeCallbacks.indexOf(callback);
+      if (index > -1) this.onConnectionChangeCallbacks.splice(index, 1);
+    };
   }
 
   public onSensorData(callback: (data: SensorData[]) => void) {
-    this.onSensorDataUpdate = callback;
+    this.onSensorDataUpdateCallbacks.push(callback);
+    return () => {
+      const index = this.onSensorDataUpdateCallbacks.indexOf(callback);
+      if (index > -1) this.onSensorDataUpdateCallbacks.splice(index, 1);
+    };
   }
 
   public onAlert(callback: (alert: AlertData) => void) {
-    this.onSensorAlert = callback;
+    this.onSensorAlertCallbacks.push(callback);
+    return () => {
+      const index = this.onSensorAlertCallbacks.indexOf(callback);
+      if (index > -1) this.onSensorAlertCallbacks.splice(index, 1);
+    };
   }
 
   public onStatusChange(callback: (status: SensorStatusChange) => void) {
-    this.onSensorStatusChange = callback;
+    this.onSensorStatusChangeCallbacks.push(callback);
+    return () => {
+      const index = this.onSensorStatusChangeCallbacks.indexOf(callback);
+      if (index > -1) this.onSensorStatusChangeCallbacks.splice(index, 1);
+    };
   }
 
   public onAlertResolve(callback: (resolution: AlertResolution) => void) {
-    this.onAlertResolution = callback;
+    this.onAlertResolutionCallbacks.push(callback);
+    return () => {
+      const index = this.onAlertResolutionCallbacks.indexOf(callback);
+      if (index > -1) this.onAlertResolutionCallbacks.splice(index, 1);
+    };
   }
 
   public onSocketError(callback: (error: any) => void) {
-    this.onError = callback;
+    this.onErrorCallbacks.push(callback);
+    return () => {
+      const index = this.onErrorCallbacks.indexOf(callback);
+      if (index > -1) this.onErrorCallbacks.splice(index, 1);
+    };
   }
 
   // Connection status
@@ -232,8 +266,23 @@ export class WebSocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+    WebSocketService.instance = null;
   }
 }
 
 // Singleton instance
 export const websocketService = new WebSocketService();
+
+// Debug function for browser console
+if (typeof window !== 'undefined') {
+  (window as any).testWebSocket = () => {
+    console.log('🔧 Testing WebSocket connection...');
+    console.log('🔧 Current connection status:', websocketService.isConnected());
+    websocketService.disconnect();
+    setTimeout(() => {
+      const service = new WebSocketService();
+      (window as any).wsService = service;
+      console.log('🔧 New WebSocket service created');
+    }, 1000);
+  };
+}
